@@ -3,8 +3,15 @@
 *Trabalho 1 · máximo 4 páginas · entrega na Aula 5*
 
 ## Problema central
+Restaurantes, padarias e mercados descartam diariamente comida ainda boa, enquanto
+ONGs e cozinhas comunitárias não conseguem descobrir a tempo o que está disponível
+para coleta. Hoje essa articulação acontece de forma informal (grupos de WhatsApp),
+sem histórico e sem previsibilidade — boa parte da comida estraga antes de alguém buscar.
 
 ## Incertezas
+- Não há dados sobre o volume real de doações por dia, nem quantas ONGs vão aderir à plataforma.
+- Não está confirmado se o gargalo real é o tempo de coleta (hipótese de Marta) ou outro fator.
+- Não se sabe se os doadores vão topar cadastrar cada doação individualmente, nem com que frequência.
 
 ## Stakeholders
 | Stakeholder | Interesse | Influência | O que espera |
