@@ -1,4 +1,4 @@
-# Prato Cheio — Kumest 
+# Prato Cheio — AKMS
 
 Projeto da disciplina **Análise, Projeto e Desenvolvimento Ágil**.
 Conecta doadores de alimentos excedentes a ONGs, antes que a comida se perca.
@@ -10,6 +10,7 @@ Conecta doadores de alimentos excedentes a ONGs, antes que a comida se perca.
 - Victor Henrique Kunz de Souza — @VictorKunzz
 - Lucas Rogério Mendonça — @mendoncaluucas
 - Vinicius Steuernagel — @steuer10
+- Alisson Gabriel Anderle — @MRanderle
 
 ## Como rodar
 
