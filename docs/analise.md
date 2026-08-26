@@ -84,8 +84,36 @@ RN1, RN3, RNI1 e RNI2 são atendíveis com o modelo de dados atual (`tipo`, `qua
 | Marta quer crescer aceitando todo doador e toda doação × qualidade exige critério mínimo | crescimento sem critério mínimo destrói a confiança da ONG, que é o ativo mais difícil de recuperar. Aceita-se todo doador, mas nenhuma doação sem os três campos obrigatórios (RN1) |
 
 ## Histórias de usuário
+
+Cada história passa pelos seis critérios do INVEST. Falhar um critério não invalida a
+história, indica onde ela vai doer e o que precisa ser decidido antes de construí-la.
+
 | # | História (Como… quero… para…) | INVEST: o que falha |
 |---|---|---|
+| H1 | Como **doador**, quero publicar uma doação informando tipo, quantidade e validade, para que uma ONG a recolha antes de estragar. | passa nos seis, é a menor coisa que já entrega valor (RN1, RNI1) |
+| H2 | Como **ONG receptora**, quero ver as doações disponíveis agora, para decidir o que consigo buscar hoje. | passa nos seis, sem H1 a lista vem vazia, mas a história funciona e se testa sozinha |
+| H3 | Como **ONG receptora**, quero aceitar uma doação disponível, para garantir que ninguém mais vá buscá-la. | **Independente**, só faz sentido depois de H1 e H2. É o preço de uma fatia vertical, não um defeito: por isso as três entram na mesma iteração (RN3, RNI2) |
+| H4 | Como **doador**, quero acompanhar as doações que publiquei e ser avisado quando alguma expirar sem ser aceita, para saber se vale a pena continuar publicando. | **Pequena** (o "e" no meio denuncia dois comportamentos) e **Independente** (depende de H1 e H3). Precisa ser quebrada antes de entrar |
+| H5 | Como **voluntário entregador**, quero ver no celular as coletas atribuídas a mim, com endereço, para cumprir a rota do dia. | **Estimável** e **Pequena**, exige cadastro de voluntário, endereço e geolocalização, que não existem no modelo de dados atual (RN4) |
+| H6 | Como **Marta**, quero gerenciar toda a operação de doações do bairro, para escalar o programa. | **Pequena**, **Estimável** e **Testável**, é épico, não história: não cabe numa iteração, ninguém consegue estimar e não há como dizer quando está pronta. Quebrada em H6a–H6c |
+| H6a | Como **quem administra a plataforma**, quero aprovar o cadastro de uma ONG antes de ela poder aceitar doações, para que só organização verificada retire alimento. | passa nos seis, atende o critério mínimo de qualidade do conflito "crescer × qualidade" |
+| H6b | Como **Marta**, quero ver, a cada semana, quantas das doações publicadas terminaram coletadas, para saber se o piloto está reduzindo o desperdício. | passa nos seis, é a métrica do Objetivo de impacto 2 |
+| H6c | Como **quem administra a plataforma**, quero retirar da lista uma doação denunciada como imprópria, para que nenhuma ONG busque alimento fora das condições. | passa nos seis, é a resposta operacional à exigência da vigilância |
+
+**Sobre a quebra de H6.** As três histórias que saíram dela têm usuário próprio, entregam
+valor sozinhas e podem ser construídas em qualquer ordem: aprovar ONG serve mesmo sem
+relatório, o número semanal serve mesmo sem moderação, e a moderação serve mesmo sem os
+outros dois. Foi isso que fez H6 ser reconhecida como épico: precisava de mais de uma
+iteração, ninguém do grupo conseguia estimá-la e ela juntava três assuntos com "e".
+
+### História zero, a fatia vertical
+
+**H1 → H2 → H3**: o doador publica uma doação, a ONG vê a lista de disponíveis, a ONG aceita e a doação some para as demais. É fina na largura e completa na profundidade, atravessa interface, regra de negócio e banco, e é o que o repositório já tem esboçado: as rotas `POST /api/doacoes`, `GET /api/doacoes` e `POST /api/doacoes/:id/aceitar` em `src/app.js`, e os cinco `it.todo` de `tests/doacoes.test.js`, que são exatamente os critérios de aceite dessa fatia.
+
+**Fica de fora de propósito**, para a fatia não engordar: janela de retirada (RN2),
+prioridade por proximidade (RN4) e confirmação de coleta com devolução da doação à lista
+(RNI3), as três exigem dados que o modelo atual não tem. Ficam registradas como regra do
+domínio e entram, ou não, nas próximas iterações.
 
 ## Critérios de aceite
 **História X** — Dado … Quando … Então …
@@ -107,4 +135,5 @@ RN1, RN3, RNI1 e RNI2 são atendíveis com o modelo de dados atual (`tipo`, `qua
 | Aula | Nível declarado | O que a IA fez | O que nós fizemos |
 |---|---|---|---|
 | 2 : stakeholders, objetivos e conflitos | IA para consulta | produziu o rascunho estruturado a partir do caso: tabela interesse × influência, formato "sujeito · condição · efeito" das regras e primeira versão do critério de decisão | revisamos ponto a ponto na revisão do Pull Request, conferimos cada regra contra o caso e assumimos as decisões: quais stakeholders além dos citados no caso entram, quais métricas medem os objetivos e qual critério resolve o conflito principal |
+| 3 : histórias de usuário | IA como colaboradora | gerou uma primeira leva de oito histórias a partir do caso, sem filtro | avaliamos cada uma pelo INVEST, descartamos as que não eram história, quebramos o épico e escolhemos a história zero. As correções estão registradas abaixo |
 
