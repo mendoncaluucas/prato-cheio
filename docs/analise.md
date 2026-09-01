@@ -116,13 +116,78 @@ prioridade por proximidade (RN4) e confirmação de coleta com devolução da do
 domínio e entram, ou não, nas próximas iterações.
 
 ## Critérios de aceite
-**História X** — Dado … Quando … Então …
+
+Critérios das três histórias da fatia vertical (história zero): H1, H2 e H3. Cada
+critério é verificável por um teste automatizado em `tests/doacoes.test.js` — o
+mapeamento critério ↔ teste está no fim da seção.
+
+**H1 — o doador publica uma doação**
+
+- CA1.1 — **Dado** um doador na tela de publicação, **quando** ele envia uma doação com tipo, quantidade e validade preenchidos, **então** a doação é registrada com status `disponivel` e passa a aparecer na lista de disponíveis. *(RN1)*
+- CA1.2 — **Dado** um doador preenchendo a publicação, **quando** ele envia sem ao menos um dos três campos obrigatórios (tipo, quantidade ou validade), **então** o sistema recusa com erro 400 e a doação não é criada. *(RN1)*
+- CA1.3 — **Dado** um doador preenchendo a publicação, **quando** a validade informada já está vencida no momento do envio, **então** o sistema recusa com erro 400 e a doação não é criada. *(RNI1)*
+
+**H2 — a ONG vê as doações disponíveis**
+
+- CA2.1 — **Dado** que existem doações com status `disponivel`, **quando** uma ONG consulta a lista de disponíveis, **então** o sistema devolve exatamente essas doações.
+- CA2.2 — **Dado** que uma doação foi aceita por alguma ONG, **quando** outra ONG consulta a lista de disponíveis, **então** essa doação não aparece mais. *(RN3)*
+
+**H3 — a ONG aceita uma doação**
+
+- CA3.1 — **Dado** uma doação disponível, **quando** uma ONG a aceita, **então** a doação passa para o status `aceita`, fica registrada em nome daquela ONG e sai da lista de disponíveis. *(RN3)*
+- CA3.2 — **Dado** uma doação já aceita por uma ONG, **quando** outra ONG tenta aceitá-la, **então** o sistema recusa com erro 400 informando que já foi aceita, e a primeira ONG permanece como responsável. *(RNI2)*
+
+### Rastreabilidade — critério ↔ teste
+
+Os cenários já esboçados como `it.todo` em `tests/doacoes.test.js` cobrem seis dos sete
+critérios. A relação não é de um para um: o primeiro teste percorre a publicação e a
+listagem no mesmo fluxo, então fecha CA1.1 e CA2.1 de uma vez.
+
+| Teste em `tests/doacoes.test.js` | Critérios que verifica |
+|---|---|
+| `mostra a doação publicada na lista de disponíveis` | CA1.1, CA2.1 |
+| `recusa doação sem os campos obrigatórios` | CA1.2 |
+| `marca a doação como aceita pela ONG` | CA3.1 |
+| `remove a doação da lista de disponíveis depois de aceita` | CA2.2 |
+| `recusa aceitar uma doação que já foi aceita por outra ONG` | CA3.2 |
+| *(a acrescentar)* `recusa doação com validade já vencida` | CA1.3 |
+
+**Sobre o CA1.3.** A RNI1 está dentro do recorte do piloto — não aparece entre as regras
+adiadas na história zero, e é atendível com o modelo de dados atual. O template do
+repositório não trouxe esse cenário entre os cinco `it.todo`, então ele é o sexto teste a
+escrever junto com o walking skeleton, com a validação correspondente em
+`src/doacoes.js`.
 
 ## Riscos
-| Risco | Probabilidade | Impacto | Mitigação |
-|---|---|---|---|
+
+| # | Risco | Probabilidade | Impacto | Mitigação |
+|---|---|:--:|:--:|---|
+| R1 | **Poucos doadores publicam** — o cadastro dá trabalho no meio da rotina de fechamento da cozinha, e o doador volta para o WhatsApp. Sem oferta, a plataforma não tem o que distribuir. | alta | alto | Manter o cadastro no mínimo viável (só os três campos obrigatórios da RN1) e medir, já no piloto, o tempo real de publicação. Se passar de ~30s, simplificar mais (campos pré-preenchidos, publicação recorrente). Começar com 3–4 doadores conhecidos, acompanhados de perto, em vez de captação ampla. |
+| R2 | **Doação aceita não é coletada a tempo** — a ONG aceita e não busca; a doação fica presa em nome dela e a comida estraga sem que outra ONG pudesse ter recolhido. | média | alto | Registrar o não-comparecimento por ONG (base para a RNI3 nas próximas iterações) e, no piloto, acompanhar manualmente cada aceite até a coleta. Deixar a janela de retirada visível na lista para a ONG só aceitar o que consegue buscar. |
 
 ## Hipótese e experimento
+
+**Suposição do caso.** Marta *acha* que o gargalo é o tempo entre a comida ficar
+disponível e alguém coletá-la — mas não há medição que confirme.
+
+**Hipótese testável.** *Reduzir o tempo entre publicação e coleta aumenta a fração de
+doações que chegam a ser coletadas antes de expirar.* Ou seja: quanto mais rápido o
+ciclo publicar → aceitar → coletar, menos comida se perde.
+
+**Experimento.** Durante as duas primeiras semanas do piloto num bairro, instrumentar o
+sistema para registrar, em cada doação, os instantes de **publicação**, **aceite** e
+**coleta confirmada**. Com isso mede-se:
+
+- a **mediana do tempo publicação → coleta** (o gargalo que Marta supõe);
+- a **fração de doações que expiram sem coleta** (o desfecho que importa).
+
+**Como a hipótese é validada ou refutada.** Cruzando as duas métricas: se as doações que
+expiram forem justamente as de maior tempo até a coleta, a hipótese se sustenta e atacar
+o tempo de coleta é prioridade. Se doações expirarem mesmo com tempo curto — ou se o
+tempo for baixo e mesmo assim houver muito desperdício —, o gargalo é outro (falta de
+ONG interessada, doação publicada tarde demais, janela curta demais) e o foco muda. O
+experimento é barato: usa dados que a própria história zero já produz, sem construir
+nada além do que o piloto precisa.
 
 ## Decisão de análise
 - **Problema:**
@@ -136,4 +201,5 @@ domínio e entram, ou não, nas próximas iterações.
 |---|---|---|---|
 | 2 : stakeholders, objetivos e conflitos | IA para consulta | produziu o rascunho estruturado a partir do caso: tabela interesse × influência, formato "sujeito · condição · efeito" das regras e primeira versão do critério de decisão | revisamos ponto a ponto na revisão do Pull Request, conferimos cada regra contra o caso e assumimos as decisões: quais stakeholders além dos citados no caso entram, quais métricas medem os objetivos e qual critério resolve o conflito principal |
 | 3 : histórias de usuário | IA como colaboradora | gerou uma primeira leva de oito histórias a partir do caso, sem filtro | avaliamos as oito pelo INVEST e mexemos em quatro: a que era tarefa técnica ("criar a tabela de doações no banco") virou H1, escrita do ponto de vista do doador; o "módulo completo de gestão" era épico e virou H6, que quebramos em H6a, H6b e H6c; a que já era critério de aceite (validar validade no passado e retornar erro 400) voltou a ser critério de aceite de H1; e "fazer login" ficou fora do recorte, porque não aparece em nenhuma regra de negócio nem em nenhum objetivo de impacto |
+| 4 : critérios de aceite, riscos e hipótese | IA como colaboradora | redigiu os critérios no formato Dado/Quando/Então a partir das histórias e das regras já aprovadas, e uma primeira versão dos riscos e do experimento | conferimos cada critério contra o código que existe no repositório e corrigimos três pontos: um critério citava a RNI1 sem tratá-la, faltava o critério da validade vencida que a Aula 3 tinha prometido a H1 (virou CA1.3), e a afirmação de que os critérios casavam um a um com os cinco `it.todo` era falsa — levantamos o mapeamento real, em que o primeiro teste cobre dois critérios e o CA1.3 ainda não tem teste. Escolhemos os riscos R1 e R2 entre os candidatos e definimos as duas métricas do experimento |
 
