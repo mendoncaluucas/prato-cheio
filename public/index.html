@@ -13,6 +13,10 @@
     button { margin-top: .8rem; cursor: pointer; }
     li { border: 1px solid #ddd; border-radius: .5rem; padding: .6rem; margin-bottom: .5rem; list-style: none; }
     ul { padding: 0; }
+    .aviso { margin: .8rem 0 0; padding: .6rem; border-radius: .5rem; font-size: .9rem; }
+    .aviso[hidden] { display: none; }
+    .aviso.erro { background: #fde8e8; border: 1px solid #f5b5b5; color: #8a1c1c; }
+    .aviso.ok { background: #e6f4ea; border: 1px solid #b7dfc4; color: #1b5e2a; }
   </style>
 </head>
 <body>
@@ -27,6 +31,7 @@
     <label for="validade">Validade / retirar até</label>
     <input id="validade" type="date">
     <button id="publicar">Publicar</button>
+    <p id="aviso" class="aviso" role="status" hidden></p>
   </fieldset>
 
   <h2>Doações disponíveis</h2>
@@ -46,11 +51,18 @@
         const botao = document.createElement('button');
         botao.textContent = 'Aceitar';
         botao.onclick = async () => {
-          await fetch(`/api/doacoes/${d.id}/aceitar`, {
+          const res = await fetch(`/api/doacoes/${d.id}/aceitar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ong: 'Minha ONG' })
           });
+          const corpo = await res.json();
+          if (res.ok) {
+            avisar(`Doação aceita: ${corpo.tipo}.`, 'ok');
+          } else {
+            // Recusa esperada quando outra ONG aceitou antes (CA3.2).
+            avisar(corpo.erro, 'erro');
+          }
           carregar();
         };
         li.appendChild(botao);
@@ -58,16 +70,39 @@
       }
     }
 
+    // A API recusa publicação e aceite com 400 e { erro }. Sem exibir essa
+    // resposta, a tela fica muda e o doador não sabe por que nada aconteceu.
+    function avisar(mensagem, tipo) {
+      const aviso = document.getElementById('aviso');
+      aviso.textContent = mensagem;
+      aviso.className = `aviso ${tipo}`;
+      aviso.hidden = false;
+    }
+
     document.getElementById('publicar').onclick = async () => {
-      await fetch('/api/doacoes', {
+      const campos = ['tipo', 'quantidade', 'validade'].map(
+        (id) => document.getElementById(id)
+      );
+      const [tipo, quantidade, validade] = campos;
+
+      const res = await fetch('/api/doacoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipo: document.getElementById('tipo').value,
-          quantidade: document.getElementById('quantidade').value,
-          validade: document.getElementById('validade').value
+          tipo: tipo.value,
+          quantidade: quantidade.value,
+          validade: validade.value
         })
       });
+      const corpo = await res.json();
+
+      if (res.ok) {
+        avisar('Doação publicada.', 'ok');
+        for (const campo of campos) campo.value = '';
+      } else {
+        // Campos obrigatórios (CA1.2) ou validade vencida (CA1.3).
+        avisar(corpo.erro, 'erro');
+      }
       carregar();
     };
 
