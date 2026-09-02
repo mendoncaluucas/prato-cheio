@@ -108,7 +108,7 @@ iteração, ninguém do grupo conseguia estimá-la e ela juntava três assuntos 
 
 ### História zero, a fatia vertical
 
-**H1 → H2 → H3**: o doador publica uma doação, a ONG vê a lista de disponíveis, a ONG aceita e a doação some para as demais. É fina na largura e completa na profundidade, atravessa interface, regra de negócio e banco, e é o que o repositório já tem esboçado: as rotas `POST /api/doacoes`, `GET /api/doacoes` e `POST /api/doacoes/:id/aceitar` em `src/app.js`, e os cinco `it.todo` de `tests/doacoes.test.js`, que são exatamente os critérios de aceite dessa fatia.
+**H1 → H2 → H3**: o doador publica uma doação, a ONG vê a lista de disponíveis, a ONG aceita e a doação some para as demais. É fina na largura e completa na profundidade, atravessa interface, regra de negócio e banco, e é o que o repositório implementa: as rotas `POST /api/doacoes`, `GET /api/doacoes` e `POST /api/doacoes/:id/aceitar` em `src/app.js`, as regras em `src/doacoes.js`, o acesso ao banco em `src/repositorio.js` e os testes de `tests/doacoes.test.js`, que são exatamente os critérios de aceite dessa fatia.
 
 **Fica de fora de propósito**, para a fatia não engordar: janela de retirada (RN2),
 prioridade por proximidade (RN4) e confirmação de coleta com devolução da doação à lista
@@ -139,24 +139,33 @@ mapeamento critério ↔ teste está no fim da seção.
 
 ### Rastreabilidade — critério ↔ teste
 
-Os cenários já esboçados como `it.todo` em `tests/doacoes.test.js` cobrem seis dos sete
-critérios. A relação não é de um para um: o primeiro teste percorre a publicação e a
-listagem no mesmo fluxo, então fecha CA1.1 e CA2.1 de uma vez.
+Todos os sete critérios têm teste automatizado em `tests/doacoes.test.js`. A relação não
+é de um para um: o primeiro teste percorre a publicação e a listagem no mesmo fluxo,
+então fecha CA1.1 e CA2.1 de uma vez.
 
 | Teste em `tests/doacoes.test.js` | Critérios que verifica |
 |---|---|
 | `mostra a doação publicada na lista de disponíveis` | CA1.1, CA2.1 |
 | `recusa doação sem os campos obrigatórios` | CA1.2 |
+| `recusa doação com validade já vencida` | CA1.3 |
 | `marca a doação como aceita pela ONG` | CA3.1 |
 | `remove a doação da lista de disponíveis depois de aceita` | CA2.2 |
 | `recusa aceitar uma doação que já foi aceita por outra ONG` | CA3.2 |
-| *(a acrescentar)* `recusa doação com validade já vencida` | CA1.3 |
+
+Com o teste de saúde, a suíte fecha em sete casos.
 
 **Sobre o CA1.3.** A RNI1 está dentro do recorte do piloto — não aparece entre as regras
 adiadas na história zero, e é atendível com o modelo de dados atual. O template do
-repositório não trouxe esse cenário entre os cinco `it.todo`, então ele é o sexto teste a
-escrever junto com o walking skeleton, com a validação correspondente em
+repositório não trouxe esse cenário entre os cinco `it.todo`, então ele foi acrescentado
+como sexto teste junto com o walking skeleton, com a validação correspondente em
 `src/doacoes.js`.
+
+**Uma observação sobre datas.** A validade é comparada com a data de hoje no fuso local,
+e não via `toISOString()`, que converte para UTC e devolveria o dia seguinte nas últimas
+três horas do dia no horário de Brasília. Os testes também usam datas relativas ao dia da
+execução: uma validade fixa venceria com o tempo e passaria a esbarrar no CA1.3,
+quebrando testes que não têm relação com ele. Validade igual ao dia de hoje é aceita —
+só recusamos datas anteriores.
 
 ## Riscos
 
@@ -201,5 +210,6 @@ nada além do que o piloto precisa.
 |---|---|---|---|
 | 2 : stakeholders, objetivos e conflitos | IA para consulta | produziu o rascunho estruturado a partir do caso: tabela interesse × influência, formato "sujeito · condição · efeito" das regras e primeira versão do critério de decisão | revisamos ponto a ponto na revisão do Pull Request, conferimos cada regra contra o caso e assumimos as decisões: quais stakeholders além dos citados no caso entram, quais métricas medem os objetivos e qual critério resolve o conflito principal |
 | 3 : histórias de usuário | IA como colaboradora | gerou uma primeira leva de oito histórias a partir do caso, sem filtro | avaliamos as oito pelo INVEST e mexemos em quatro: a que era tarefa técnica ("criar a tabela de doações no banco") virou H1, escrita do ponto de vista do doador; o "módulo completo de gestão" era épico e virou H6, que quebramos em H6a, H6b e H6c; a que já era critério de aceite (validar validade no passado e retornar erro 400) voltou a ser critério de aceite de H1; e "fazer login" ficou fora do recorte, porque não aparece em nenhuma regra de negócio nem em nenhum objetivo de impacto |
-| 4 : critérios de aceite, riscos e hipótese | IA como colaboradora | redigiu os critérios no formato Dado/Quando/Então a partir das histórias e das regras já aprovadas, e uma primeira versão dos riscos e do experimento | conferimos cada critério contra o código que existe no repositório e corrigimos três pontos: um critério citava a RNI1 sem tratá-la, faltava o critério da validade vencida que a Aula 3 tinha prometido a H1 (virou CA1.3), e a afirmação de que os critérios casavam um a um com os cinco `it.todo` era falsa — levantamos o mapeamento real, em que o primeiro teste cobre dois critérios e o CA1.3 ainda não tem teste. Escolhemos os riscos R1 e R2 entre os candidatos e definimos as duas métricas do experimento |
+| 4 : critérios de aceite, riscos e hipótese | IA como colaboradora | redigiu os critérios no formato Dado/Quando/Então a partir das histórias e das regras já aprovadas, e uma primeira versão dos riscos e do experimento | conferimos cada critério contra o código que existe no repositório e corrigimos três pontos: um critério citava a RNI1 sem tratá-la, faltava o critério da validade vencida que a Aula 3 tinha prometido a H1 (virou CA1.3), e a afirmação de que os critérios casavam um a um com os cinco `it.todo` era falsa — levantamos o mapeamento real, em que o primeiro teste cobre dois critérios. Escolhemos os riscos R1 e R2 entre os candidatos e definimos as duas métricas do experimento |
+| 4 : walking skeleton | IA como colaboradora | implementou as duas camadas que faltavam (`src/repositorio.js` e `src/doacoes.js`) e converteu os cinco `it.todo` do template em testes reais, mais o sexto teste do CA1.3 | rodamos a suíte e o servidor para conferir o fluxo ponta a ponta pelas rotas. Verificamos que o teste do CA1.3 realmente falha quando a validação é removida, em vez de aceitar o verde. Corrigimos duas coisas na proposta da IA: a validade seria comparada com `toISOString()`, que devolve a data em UTC e erraria o dia nas últimas três horas do horário de Brasília, e os testes usavam uma validade fixa que já estava vencida — passaram a usar datas relativas ao dia da execução |
 
