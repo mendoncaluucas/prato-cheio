@@ -199,10 +199,66 @@ experimento é barato: usa dados que a própria história zero já produz, sem c
 nada além do que o piloto precisa.
 
 ## Decisão de análise
-- **Problema:**
-- **Alternativas:**
-- **Decisão e justificativa:**
-- **Riscos e limitações:**
+
+### Recorte de escopo do piloto
+
+**Problema.** O caso traz sete regras de negócio — quatro explícitas (RN1 a RN4) e três
+que explicitamos (RNI1 a RNI3) —, mas o prazo é um piloto em poucas semanas, num bairro
+só, com equipe pequena e orçamento próximo de zero. Não dá para construir tudo. Era
+preciso decidir **quanto do domínio entra na primeira iteração** — e essa decisão define
+o que o walking skeleton prova e o que fica em aberto.
+
+**Alternativas consideradas.**
+
+| | Alternativa | A favor | Contra |
+|---|---|---|---|
+| A | **Implementar as sete regras** antes de colocar no ar | atende o domínio inteiro; a vigilância e as ONGs veem o produto completo | RN2, RN4 e RNI3 exigem dados que não temos (hora de coleta, localização, confirmação de retirada). Definir esses campos sem medição no campo é chutar. Estoura o prazo e adia qualquer aprendizado real |
+| B | **Só o cadastro de doações** (publicar e listar), deixando o aceite para depois | menor esforço; entrega uma tela rapidamente | não fecha nenhum ciclo: a ONG vê a doação e não tem o que fazer com ela. Não valida a regra mais delicada do caso (RN3/RNI2) nem gera o dado de que o experimento precisa |
+| C | **Fatia vertical H1 → H2 → H3**, adiando RN2, RN4 e RNI3 | atravessa interface, regra e banco; fecha o ciclo publicar → ver → aceitar; produz os instantes que o experimento mede | entrega menos funcionalidade visível; regras conhecidas ficam registradas e não implementadas |
+
+**Decisão e justificativa.** Escolhemos a **alternativa C**.
+
+A razão principal é o que cada alternativa nos ensina. A alternativa A gasta o prazo
+inteiro construindo sobre suposições: as três regras adiadas dependem de dados que só
+existem depois que alguém usa o sistema, e a própria incerteza registrada neste documento
+diz que não sabemos qual é o gargalo real. Construir primeiro e medir depois inverte a
+ordem.
+
+A alternativa B falha pelo motivo oposto: é pequena, mas não é uma fatia — corta o
+domínio na horizontal. Sem o aceite, a regra "uma doação aceita não fica disponível para
+outra" (RN3, RNI2) nunca é exercitada, e ela é justamente a que tem risco técnico, por
+envolver duas ONGs disputando o mesmo registro.
+
+A alternativa C é a menor fatia que ainda fecha um ciclo completo de valor: o doador
+publica, a ONG vê e aceita, e a doação sai da lista. Ela exercita as quatro regras
+atendíveis pelo modelo de dados atual (RN1, RN3, RNI1, RNI2), atravessa as três camadas —
+o que prova a arquitetura e o pipeline de CI cedo, quando mudar ainda é barato — e produz
+os registros de publicação e aceite que o experimento da hipótese precisa medir.
+
+O critério que separou o que entra do que fica de fora foi objetivo: **uma regra entra no
+piloto se for atendível com os campos que já temos** (`tipo`, `quantidade`, `validade`,
+`status`, `ong`). RN2 (janela de retirada), RN4 (prioridade por proximidade) e RNI3
+(devolver à lista quando não há coleta) exigem hora de coleta, localização e confirmação
+de retirada — dados que o modelo não tem e cuja forma depende de como a operação
+acontecer na prática.
+
+**Riscos e limitações.**
+
+- O piloto **não mede proximidade** (RN4): as ONGs veem a mesma lista, sem vantagem
+  logística para quem está mais perto. Se a coleta se mostrar lenta por distância, a
+  decisão precisa ser revista já na Unidade 2.
+- A **janela de retirada não é aplicada** (RN2): uma doação continua visível mesmo com a
+  janela vencida, e depende do olho da ONG. Mitigamos parcialmente com a RNI1, que ao
+  menos impede publicar algo já vencido.
+- Uma doação aceita e **não coletada fica presa** (RNI3): não volta para a lista e outra
+  ONG não pode recolhê-la. É exatamente o risco R2, e no piloto ele é tratado com
+  acompanhamento manual, não pelo sistema.
+- A vigilância sanitária **perde granularidade**: sem lote, temperatura, foto ou origem
+  detalhada, a rastreabilidade fica no mínimo — o que satisfaz o critério do conflito
+  principal, mas pode não bastar se o piloto crescer.
+- Como o recorte reduz o que aparece na tela, existe o risco de a Marta ler o piloto como
+  "pouca coisa pronta". A resposta é a medição: as três regras adiadas voltam ao debate
+  com dado do campo, não com opinião.
 
 ## Uso de IA
 
@@ -212,4 +268,5 @@ nada além do que o piloto precisa.
 | 3 : histórias de usuário | IA como colaboradora | gerou uma primeira leva de oito histórias a partir do caso, sem filtro | avaliamos as oito pelo INVEST e mexemos em quatro: a que era tarefa técnica ("criar a tabela de doações no banco") virou H1, escrita do ponto de vista do doador; o "módulo completo de gestão" era épico e virou H6, que quebramos em H6a, H6b e H6c; a que já era critério de aceite (validar validade no passado e retornar erro 400) voltou a ser critério de aceite de H1; e "fazer login" ficou fora do recorte, porque não aparece em nenhuma regra de negócio nem em nenhum objetivo de impacto |
 | 4 : critérios de aceite, riscos e hipótese | IA como colaboradora | redigiu os critérios no formato Dado/Quando/Então a partir das histórias e das regras já aprovadas, e uma primeira versão dos riscos e do experimento | conferimos cada critério contra o código que existe no repositório e corrigimos três pontos: um critério citava a RNI1 sem tratá-la, faltava o critério da validade vencida que a Aula 3 tinha prometido a H1 (virou CA1.3), e a afirmação de que os critérios casavam um a um com os cinco `it.todo` era falsa — levantamos o mapeamento real, em que o primeiro teste cobre dois critérios. Escolhemos os riscos R1 e R2 entre os candidatos e definimos as duas métricas do experimento |
 | 4 : walking skeleton | IA como colaboradora | implementou as duas camadas que faltavam (`src/repositorio.js` e `src/doacoes.js`) e converteu os cinco `it.todo` do template em testes reais, mais o sexto teste do CA1.3 | rodamos a suíte e o servidor para conferir o fluxo ponta a ponta pelas rotas. Verificamos que o teste do CA1.3 realmente falha quando a validação é removida, em vez de aceitar o verde. Corrigimos duas coisas na proposta da IA: a validade seria comparada com `toISOString()`, que devolve a data em UTC e erraria o dia nas últimas três horas do horário de Brasília, e os testes usavam uma validade fixa que já estava vencida — passaram a usar datas relativas ao dia da execução |
+| 4 : decisão de análise | IA como colaboradora | organizou no formato problema / alternativas / decisão / riscos o recorte de escopo que já havíamos adotado, e redigiu as três alternativas com prós e contras | a decisão de adiar RN2, RN4 e RNI3 já era nossa, tomada na Aula 3 ao escolher a história zero; aqui apenas a formalizamos. Definimos o critério objetivo que separa o que entra do que fica de fora (ser atendível com os campos que o modelo já tem) e conferimos cada limitação contra as regras de negócio e os riscos deste documento |
 
