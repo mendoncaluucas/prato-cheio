@@ -16,19 +16,4 @@ manual. A Unidade 2 exige decidir quanto desse débito entra no incremento agora
 2. **RN2 + RNI3** — além da janela, devolve a doação à lista quando a coleta não é
    confirmada a tempo. Mitiga R2 por completo, mas exige um mecanismo de checagem de
    expiração (job ou verificação na leitura).
-3. **RN2 + RN4 + RNI3 (as três regras adiadas)** — fecha o domínio descrito na Análise,
-   mas RN4 exige geolocalização e cálculo de distância, dado que a Unidade 1 não coletou
-   nem testou em campo.
-
-## Decisão
-[PREENCHER — o grupo decide entre as três alternativas acima ou uma variação, e registra
-aqui o motivo]
-
-## Consequências
-- Positivas:
-- Negativas / o que abrimos mão:
-- Riscos e o que fazer se der errado:
-
-## Rastreabilidade
-Atende ao risco R2 (`docs/analise.md`) e, dependendo da alternativa escolhida, às regras
-RN2, RN4 e/ou RNI3.
+3. **RN2 +
