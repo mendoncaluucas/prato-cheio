@@ -62,6 +62,15 @@ Formato: **sujeito · condição · efeito**, de modo que cada regra possa virar
 
 RN1, RN3, RNI1 e RNI2 são atendíveis com o modelo de dados atual (`tipo`, `quantidade`, `validade`, `status`, `ong`). RN2, RN4 e RNI3 exigem dados que ainda não temos — hora da coleta, localização e confirmação de retirada. Elas ficam registradas aqui como regra do domínio, mas **entram ou não no recorte do piloto** conforme a decisão de escopo da Aula 3.
 
+> **Revisão na Unidade 2.** Ao projetar o incremento seguinte, revimos esta
+> classificação: a RN2 não depende de nenhum dos três dados listados. Seu critério de
+> verificação — doação com janela vencida não aparece na listagem — se resolve com o
+> campo `validade`, que já existe e já é usado pela RNI1. Só a RN4 e a RNI3 exigem dados
+> novos. Mantivemos o texto original como registro da Unidade 1; a correção e suas
+> consequências estão no [ADR 0001](adr/0001-escopo-unidade-2.md) e na decisão D1 do
+> [documento de projeto](projeto.md). A mesma classificação aparece na seção
+> "História zero" e na alternativa A da "Decisão de análise", e vale a mesma revisão.
+
 ## Conflitos de prioridade
 
 ### Conflito principal — simplicidade do doador × rastreabilidade da vigilância
