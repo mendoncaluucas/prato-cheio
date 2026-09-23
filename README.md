@@ -97,8 +97,8 @@ funciona ponta a ponta — **um doador publica uma doação → uma ONG vê a do
 aceita e ela sai da lista** —, e a interface exibe as recusas da API.
 
 **Em andamento — Unidade 2 (Projeto):** decisões de projeto e tabela de trade-offs em
-`docs/projeto.md`, e os ADRs em `docs/adr/`. O ADR 0001 (escopo do incremento) está como
-proposto, aguardando ratificação do grupo; o ADR 0002 (como o PostgreSQL sobe) está aceito.
+`docs/projeto.md`, e os ADRs em `docs/adr/`, ambos aceitos: o 0001 define o escopo do
+incremento e o 0002, como o PostgreSQL sobe na Unidade 3.
 
 **Próximo:** implementar o incremento definido no ADR 0001 e completar o documento de
 projeto (diagramas, requisitos não-funcionais e critérios de validação).
