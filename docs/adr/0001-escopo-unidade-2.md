@@ -1,7 +1,12 @@
 # ADR 0001 — Escopo da Unidade 2: qual regra adiada entra agora
 
-- **Data:** 21/09/2026
-- **Status:** proposto (aguarda ratificação do grupo até 08/10)
+- **Data:** 21/09/2026 (proposto) · 23/09/2026 (aceito)
+- **Status:** aceito
+
+> Proposto em 21/09 e deixado aberto para o grupo no PR #7, com prazo até 08/10. Aceito em
+> 23/09 por decisão de Lucas, para destravar a implementação do incremento a tempo do
+> Trabalho 2 (15/10), com o grupo avisado. Se alguém discordar, o ADR é revisto e o status
+> passa a `substituído` por um novo registro.
 
 ## Contexto
 O `docs/analise.md` deixou três regras de negócio fora do walking skeleton da Unidade 1
