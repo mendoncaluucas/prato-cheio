@@ -31,7 +31,7 @@ Mapa por **interesse × influência**. Tipo conforme o papel: usuário, patrocin
 **Leitura do mapa.** Os três de cima concentram interesse e influência: é entre eles que as prioridades colidem, e é onde a análise precisa decidir (ver *Conflitos de prioridade*). A
 vigilância tem interesse baixo mas influência alta — não usa o sistema e mesmo assim pode inviabilizá-lo, então entra como restrição, não como pedido de funcionalidade. Voluntários e administração têm influência baixa sobre o **quê**, mas ditam os requisitos não-funcionais (celular, conexão instável, operação manual no piloto).
 
-Os quatro últimos **não estão nomeados no caso** e foram levantados por nós: quem opera o sistema no dia a dia, quem é afetado sem nunca clicar num botão e quem vai pagar a conta depois do piloto.
+Os três últimos **não estão nomeados no caso** e foram levantados por nós: quem opera o sistema no dia a dia, quem é afetado sem nunca clicar num botão e quem vai pagar a conta depois do piloto.
 
 ## Objetivos de impacto
 
