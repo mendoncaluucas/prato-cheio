@@ -12,6 +12,13 @@ Conecta doadores de alimentos excedentes a ONGs, antes que a comida se perca.
 - Vinicius Steuernagel — @steuer10
 - Alisson Gabriel Anderle — @MRanderle
 
+**AKMS** são as iniciais dos sobrenomes dos integrantes: **A**nderle, **K**unz,
+**M**endonça e **S**teuernagel.
+
+> Este repositório foi criado por **Fork** do template da disciplina, porque o botão
+> "Use this template" não estava disponível. Conteúdo, estrutura, CI e testes são
+> idênticos aos do template.
+
 ## Como rodar
 
 Requisito: **Node.js 22.13 ou superior**. Mais nada — o banco da Unidade 1 é SQLite, embutido no próprio Node.
@@ -83,13 +90,18 @@ peça a revisão de **outro integrante**. Só então faça o merge.
 
 ## O que já está pronto e o que falta
 
-Pronto: estrutura do projeto, interface básica, rota de saúde, **conexão com o banco e o schema** (`src/db.js`), CI configurado e um teste passando (prova que a aplicação sobe).
+**Pronto — Unidade 1 (Análise):** o documento de análise completo (`docs/analise.md`) e o
+**walking skeleton**: `src/doacoes.js` (regras de negócio), `src/repositorio.js` (SQL) e
+7 testes em `tests/doacoes.test.js`, cobrindo os critérios de aceite. A história zero
+funciona ponta a ponta — **um doador publica uma doação → uma ONG vê a doação → a ONG a
+aceita e ela sai da lista** —, e a interface exibe as recusas da API.
 
-Falta (Trabalho 1 — walking skeleton): implementar `src/doacoes.js` (regras) e
-`src/repositorio.js` (SQL) para que a história zero funcione ponta a ponta —
-**um doador publica uma doação → uma ONG vê a doação → a ONG a aceita e ela sai da lista.**
-Os critérios de aceite estão em `tests/doacoes.test.js` como `it.todo`: troque cada um
-por um teste de verdade conforme implementa.
+**Em andamento — Unidade 2 (Projeto):** decisões de projeto e tabela de trade-offs em
+`docs/projeto.md`, e os ADRs em `docs/adr/`. O ADR 0001 (escopo do incremento) está como
+proposto, aguardando ratificação do grupo; o ADR 0002 (como o PostgreSQL sobe) está aceito.
+
+**Próximo:** implementar o incremento definido no ADR 0001 e completar o documento de
+projeto (diagramas, requisitos não-funcionais e critérios de validação).
 
 ## Uso de IA
 

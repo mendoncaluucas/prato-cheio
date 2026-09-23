@@ -9,3 +9,6 @@ dados.sqlite-journal
 
 # artefatos temporários do vitest
 *.timestamp-*
+
+# configuração local de ferramentas de IA (não faz parte do projeto)
+.claude/
