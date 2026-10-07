@@ -30,8 +30,15 @@ export async function criarDoacao({ tipo, quantidade, validade }) {
 }
 
 // H2 — a ONG vê as doações disponíveis (CA2.1, CA2.2).
+// RN2: doação com a janela de retirada vencida deixa de aparecer. A validade do
+// próprio dia ainda vale, como na publicação.
 export async function listarDisponiveis() {
-  return repo.listarDisponiveis();
+  return repo.listarDisponiveis(hoje());
+}
+
+// Doações aceitas que ainda esperam a confirmação de coleta (ADR 0001).
+export async function listarAguardandoColeta() {
+  return repo.listarAguardandoColeta();
 }
 
 // H3 — a ONG aceita uma doação (CA3.1, CA3.2).
@@ -43,12 +50,40 @@ export async function aceitar(id, ong) {
   if (doacao.status !== 'disponivel') {
     throw new Error('doação já foi aceita por outra ONG');
   }
+  // RN2: fora da janela, a doação já não está disponível — mesmo que ainda tenha
+  // aparecido na lista de quem a abriu antes da virada do dia.
+  if (doacao.validade < hoje()) {
+    throw new Error('doação vencida: a janela de retirada já passou');
+  }
 
   const atualizada = await repo.aceitar(id, ong);
   // O UPDATE já filtra por status disponível. Se não devolveu linha, outra ONG
   // aceitou entre a busca acima e a escrita — aqui isso vira mensagem de erro.
   if (!atualizada) {
     throw new Error('doação já foi aceita por outra ONG');
+  }
+  return atualizada;
+}
+
+// ADR 0001 — a ONG confirma que buscou a doação. Fecha o ciclo de vida
+// disponivel → aceita → coletada e registra a hora da coleta, que o experimento da
+// hipótese e o Objetivo de Impacto 1 precisam medir.
+export async function coletar(id) {
+  const doacao = await repo.buscarPorId(id);
+  if (!doacao) {
+    throw new Error('doação não encontrada');
+  }
+  if (doacao.status === 'coletada') {
+    throw new Error('a coleta desta doação já foi confirmada');
+  }
+  if (doacao.status !== 'aceita') {
+    throw new Error('só é possível confirmar a coleta de uma doação aceita');
+  }
+
+  const atualizada = await repo.coletar(id);
+  // Mesmo raciocínio do aceite: se não voltou linha, outra confirmação chegou antes.
+  if (!atualizada) {
+    throw new Error('a coleta desta doação já foi confirmada');
   }
   return atualizada;
 }

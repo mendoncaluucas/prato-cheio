@@ -37,8 +37,44 @@
   <h2>Doações disponíveis</h2>
   <ul id="lista"></ul>
 
+  <h2>Aguardando coleta</h2>
+  <ul id="aguardando"></ul>
+
   <script>
-    async function carregar() {
+    // Recarrega as duas listas: aceitar tira a doação de uma e põe na outra.
+    function carregar() {
+      carregarDisponiveis();
+      carregarAguardando();
+    }
+
+    async function carregarAguardando() {
+      const res = await fetch('/api/doacoes/aceitas');
+      const doacoes = await res.json();
+      const lista = document.getElementById('aguardando');
+      lista.innerHTML = doacoes.length
+        ? ''
+        : '<li>Nenhuma doação aguardando coleta.</li>';
+      for (const d of doacoes) {
+        const li = document.createElement('li');
+        li.textContent = `${d.tipo} — ${d.quantidade} · aceita por ${d.ong} `;
+        const botao = document.createElement('button');
+        botao.textContent = 'Confirmar coleta';
+        botao.onclick = async () => {
+          const res = await fetch(`/api/doacoes/${d.id}/coletar`, { method: 'POST' });
+          const corpo = await res.json();
+          if (res.ok) {
+            avisar(`Coleta confirmada: ${corpo.tipo}.`, 'ok');
+          } else {
+            avisar(corpo.erro, 'erro');
+          }
+          carregar();
+        };
+        li.appendChild(botao);
+        lista.appendChild(li);
+      }
+    }
+
+    async function carregarDisponiveis() {
       const res = await fetch('/api/doacoes');
       const doacoes = await res.json();
       const lista = document.getElementById('lista');

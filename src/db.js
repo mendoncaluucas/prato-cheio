@@ -41,9 +41,20 @@ export async function migrar() {
       validade    TEXT NOT NULL,
       status      TEXT NOT NULL DEFAULT 'disponivel',
       ong         TEXT,
-      criada_em   TEXT NOT NULL DEFAULT (datetime('now'))
+      criada_em   TEXT NOT NULL DEFAULT (datetime('now')),
+      aceita_em   TEXT,
+      coletada_em TEXT
     )
   `);
+
+  // Colunas acrescentadas na Unidade 2 (ADR 0001). O CREATE TABLE acima não altera
+  // uma tabela que já existe, então um dados.sqlite criado antes recebe as colunas aqui.
+  const existentes = conexao().prepare('PRAGMA table_info(doacoes)').all().map((c) => c.name);
+  for (const coluna of ['aceita_em', 'coletada_em']) {
+    if (!existentes.includes(coluna)) {
+      conexao().exec(`ALTER TABLE doacoes ADD COLUMN ${coluna} TEXT`);
+    }
+  }
 }
 
 /** Apaga todos os dados. Usado pelos testes. */

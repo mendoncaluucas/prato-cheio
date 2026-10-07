@@ -100,8 +100,14 @@ aceita e ela sai da lista** —, e a interface exibe as recusas da API.
 `docs/projeto.md`, e os ADRs em `docs/adr/`, ambos aceitos: o 0001 define o escopo do
 incremento e o 0002, como o PostgreSQL sobe na Unidade 3.
 
-**Próximo:** implementar o incremento definido no ADR 0001 e completar o documento de
-projeto (diagramas, requisitos não-funcionais e critérios de validação).
+O incremento do ADR 0001 está implementado: doação com a janela vencida some da lista e
+não pode mais ser aceita (RN2), a ONG confirma a coleta em `POST /api/doacoes/:id/coletar`,
+e cada doação guarda a hora em que foi publicada, aceita e coletada. Quem já tinha um
+`dados.sqlite` da Unidade 1 não precisa apagá-lo: as colunas novas são acrescentadas ao
+subir o servidor.
+
+**Próximo:** completar o documento de projeto (diagramas, requisitos não-funcionais e
+critérios de validação).
 
 ## Uso de IA
 

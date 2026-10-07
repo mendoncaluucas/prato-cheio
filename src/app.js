@@ -33,5 +33,21 @@ export function criarApp() {
     }
   });
 
+  app.get('/api/doacoes/aceitas', async (req, res) => {
+    try {
+      res.json(await doacoes.listarAguardandoColeta());
+    } catch (erro) {
+      res.status(400).json({ erro: erro.message });
+    }
+  });
+
+  app.post('/api/doacoes/:id/coletar', async (req, res) => {
+    try {
+      res.json(await doacoes.coletar(req.params.id));
+    } catch (erro) {
+      res.status(400).json({ erro: erro.message });
+    }
+  });
+
   return app;
 }
