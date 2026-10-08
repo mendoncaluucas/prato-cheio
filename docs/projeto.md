@@ -57,7 +57,10 @@ nenhuma regra de negócio conhece a origem do banco.
 | ADR | Decisão | Status |
 |---|---|---|
 | [0001](adr/0001-escopo-unidade-2.md) | Escopo do incremento da Unidade 2 (D1) | aceito |
-| [0002](adr/0002-subida-postgresql.md) | Como o PostgreSQL sobe na Unidade 3 (D2) | aceito |
+| [0002](adr/0002-subida-postgresql.md) | Como o PostgreSQL sobe na Unidade 3 (D2) | aceito; revisto pelo 0005, mantido para o piloto |
+| [0003](adr/0003-migrar-sqlite-para-postgresql.md) | Migrar o banco de SQLite para PostgreSQL | aceito; reavaliado pelo 0005, mantido |
+| [0004](adr/0004-reescrita-usar-postgresql.md) | Usar PostgreSQL — reescrita de um registro incompleto | aceito |
+| [0005](adr/0005-reavaliacao-postgresql-varias-cidades.md) | Reavaliação do 0003 para várias cidades | aceito |
 
 A decisão D3 não tem ADR próprio: ela foi tomada durante o walking skeleton da Unidade 1
 e está documentada aqui e no comentário de `aceitar()`, em `src/repositorio.js`.
