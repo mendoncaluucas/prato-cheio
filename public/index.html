@@ -17,6 +17,7 @@
     .aviso[hidden] { display: none; }
     .aviso.erro { background: #fde8e8; border: 1px solid #f5b5b5; color: #8a1c1c; }
     .aviso.ok { background: #e6f4ea; border: 1px solid #b7dfc4; color: #1b5e2a; }
+    button.secundario { margin-top: .4rem; background: none; border: 1px solid #c8a3a3; color: #8a1c1c; font-size: .85rem; padding: .4rem; }
   </style>
 </head>
 <body>
@@ -70,6 +71,7 @@
           carregar();
         };
         li.appendChild(botao);
+        li.appendChild(botaoRetirar(d));
         lista.appendChild(li);
       }
     }
@@ -102,12 +104,38 @@
           carregar();
         };
         li.appendChild(botao);
+        li.appendChild(botaoRetirar(d));
         lista.appendChild(li);
       }
     }
 
     // A API recusa publicação e aceite com 400 e { erro }. Sem exibir essa
     // resposta, a tela fica muda e o doador não sabe por que nada aconteceu.
+    // H6c — retirar uma doação denunciada como imprópria. Vale para disponíveis e para
+    // aceitas ainda não coletadas; o motivo é obrigatório e a API recusa sem ele.
+    function botaoRetirar(d) {
+      const botao = document.createElement('button');
+      botao.textContent = 'Retirar (imprópria)';
+      botao.className = 'secundario';
+      botao.onclick = async () => {
+        const motivo = prompt(`Motivo da retirada de "${d.tipo}":`);
+        if (motivo === null) return; // cancelou
+        const res = await fetch(`/api/doacoes/${d.id}/retirar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ motivo })
+        });
+        const corpo = await res.json();
+        if (res.ok) {
+          avisar(`Doação retirada: ${corpo.tipo}.`, 'ok');
+        } else {
+          avisar(corpo.erro, 'erro');
+        }
+        carregar();
+      };
+      return botao;
+    }
+
     function avisar(mensagem, tipo) {
       const aviso = document.getElementById('aviso');
       aviso.textContent = mensagem;

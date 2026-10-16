@@ -60,6 +60,21 @@ export async function aceitar(id, ong) {
   return rows[0];
 }
 
+// H6c — retira uma doação denunciada como imprópria e devolve a linha atualizada.
+// Só vale para doação ainda não entregue (disponível ou aceita). A condição fica no
+// próprio UPDATE pelo mesmo motivo do aceite: uma retirada e uma confirmação de coleta
+// simultâneas não podem ambas vencer.
+export async function retirar(id, motivo) {
+  const { rows } = await query(
+    `UPDATE doacoes
+        SET status = 'retirada', motivo_retirada = ?, retirada_em = datetime('now')
+      WHERE id = ? AND status IN ('disponivel', 'aceita')
+     RETURNING *`,
+    [motivo, id]
+  );
+  return rows[0];
+}
+
 // Confirma a coleta de uma doação aceita e devolve a linha atualizada.
 // Mesma proteção do aceite: a condição de status fica no próprio UPDATE, então uma
 // segunda confirmação não regrava a hora da primeira.

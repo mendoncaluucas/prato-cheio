@@ -2,6 +2,40 @@
 
 *Trabalho 2 · máximo 4 páginas (fora diagramas) · entrega na Aula 10*
 
+## Histórias implementadas na Unidade 2
+
+Além do incremento do [ADR 0001](adr/0001-escopo-unidade-2.md) (RN2, confirmação de coleta
+e marcas de hora), a Unidade 2 implementa duas histórias que ficaram de fora da Unidade 1.
+Os testes estão em `tests/doacoes.test.js`, no bloco com o nome de cada história.
+
+### H6c — retirar uma doação denunciada
+
+> Como **quem administra a plataforma**, quero retirar da lista uma doação denunciada como
+> imprópria, para que nenhuma ONG busque alimento fora das condições.
+
+Rota: `POST /api/doacoes/:id/retirar`, com `{ motivo }`. Na interface, o botão
+*Retirar (imprópria)* aparece nas doações disponíveis e nas que aguardam coleta.
+
+| Critério | Dado / Quando / Então |
+|---|---|
+| CA6c.1 | **Dado** uma doação disponível denunciada, **quando** quem administra a retira com um motivo, **então** ela passa a `retirada`, some da lista e o motivo e a hora ficam registrados |
+| CA6c.2 | **Dado** uma doação aceita e ainda não coletada, **quando** é retirada, **então** sai de "aguardando coleta" e a ONG não consegue mais confirmar a coleta |
+| CA6c.3 | **Dado** uma doação disponível, **quando** se tenta retirá-la sem motivo, **então** a API recusa com 400 e ela continua disponível |
+| CA6c.4 | **Dado** uma doação já coletada, **quando** se tenta retirá-la, **então** a API recusa com 400, porque o alimento já foi entregue |
+| CA6c.5 | **Dado** uma doação já retirada, **quando** se tenta retirá-la de novo, **então** a API recusa com 400 e o primeiro motivo é mantido |
+| CA6c.6 | **Dado** uma doação retirada, **quando** uma ONG tenta aceitá-la, **então** a recusa diz que ela foi retirada, e não que outra ONG a aceitou |
+
+Decisões de comportamento:
+- **Disponível e aceita podem ser retiradas; coletada, não.** Uma ONG que aceitou um
+  alimento impróprio também não deve ir buscá-lo. Depois da coleta, retirar não tem efeito
+  sobre o alimento.
+- **O motivo é obrigatório.** A retirada é a resposta operacional à vigilância sanitária,
+  e o motivo é o registro que ela pode cobrar.
+- **A condição de status fica no próprio `UPDATE`**, como no aceite (decisão D3): uma
+  retirada e uma confirmação de coleta simultâneas não podem ambas vencer.
+- **Limitação:** o sistema não tem login, então qualquer pessoa consegue chamar a rota de
+  retirada. "Quem administra" ainda não é um papel controlado pelo sistema.
+
 ## Decisões de projeto
 
 Cada decisão abaixo responde a algo que a Unidade de Análise já havia levantado — uma
