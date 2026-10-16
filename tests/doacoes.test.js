@@ -425,8 +425,12 @@ describe('relatório semanal (H6b)', () => {
 
     const [s] = (await relatorio()).body;
 
-    expect(s).toMatchObject({ publicadas: 5, coletadas: 1, retiradas: 1, vencidasSemColeta: 2, emAberto: 1 });
-    expect(s.coletadas + s.retiradas + s.vencidasSemColeta + s.emAberto).toBe(s.publicadas);
+    expect(s).toMatchObject({
+      publicadas: 5, coletadas: 1, coletadasAposVencimento: 0, retiradas: 1, vencidasSemColeta: 2, emAberto: 1
+    });
+    expect(
+      s.coletadas + s.coletadasAposVencimento + s.retiradas + s.vencidasSemColeta + s.emAberto
+    ).toBe(s.publicadas);
   });
 
   // CA6b.3
@@ -511,6 +515,186 @@ describe('relatório semanal (H6b)', () => {
 // doacoes.js barra esses casos antes, então a condição do banco só agiria numa corrida
 // real entre duas requisições. Estes testes chamam o repositório direto, sem a
 // verificação, para provar que o banco sozinho também recusa.
+describe('coleta após o vencimento (H6b, opção registrada no projeto)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  // Horários ao meio-dia em UTC: no fuso do Brasil continua sendo o mesmo dia, então o
+  // teste dá o mesmo resultado aqui e no CI, que roda em UTC.
+  // CA6b.7
+  it('conta à parte a coleta confirmada depois da validade, fora da taxa', async () => {
+    doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-07', coletadaEm: '2026-10-06 12:00:00' });
+    doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-06', coletadaEm: '2026-10-09 12:00:00' });
+
+    const [s] = (await relatorio()).body;
+
+    expect(s.coletadas).toBe(1);
+    expect(s.coletadasAposVencimento).toBe(1);
+    expect(s.taxaColeta).toBe(50); // só a coletada no prazo conta como comida salva
+  });
+
+  it('considera no prazo a coleta feita no próprio dia da validade', async () => {
+    doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-06', coletadaEm: '2026-10-06 15:00:00' });
+
+    const [s] = (await relatorio()).body;
+
+    expect(s.coletadas).toBe(1);
+    expect(s.coletadasAposVencimento).toBe(0);
+  });
+
+  it('continua permitindo confirmar a coleta de uma doação aceita que já venceu', async () => {
+    const { id } = await repo.inserir({ tipo: 'Pão', quantidade: '5', validade: VALIDADE_FUTURA });
+    await repo.aceitar(id, 'Amigos do Bem');
+    conexao().prepare('UPDATE doacoes SET validade = ? WHERE id = ?').run(VALIDADE_VENCIDA, id);
+
+    const res = await coletar(id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('coletada');
+  });
+});
+
+describe('validação de entrada', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  async function nadaFoiCriado() {
+    const { rows } = { rows: conexao().prepare('SELECT COUNT(*) AS n FROM doacoes').all() };
+    expect(rows[0].n).toBe(0);
+  }
+
+  // Com a validade comparada como texto, estes formatos escapavam da RN2 e da RNI1:
+  // "31/12/2020" ficava disponível para sempre, mesmo vencida.
+  it.each([
+    ['formato brasileiro', '31/12/2020'],
+    ['texto qualquer', 'abc'],
+    ['número', 20261231],
+    ['dia que não existe', '2027-02-31'],
+    ['mês que não existe', '2027-13-01']
+  ])('recusa validade em %s', async (_, validade) => {
+    const res = await publicar({ ...doacaoValida, validade });
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/AAAA-MM-DD/);
+    await nadaFoiCriado();
+  });
+
+  it('recusa campos preenchidos só com espaços (RN1)', async () => {
+    const res = await publicar({ tipo: '   ', quantidade: '  ', validade: VALIDADE_FUTURA });
+
+    expect(res.status).toBe(400);
+    await nadaFoiCriado();
+  });
+
+  it('grava os textos sem os espaços das pontas', async () => {
+    const res = await publicar({ ...doacaoValida, tipo: '  Sopa  ', quantidade: ' 10 porções ' });
+
+    expect(res.body.tipo).toBe('Sopa');
+    expect(res.body.quantidade).toBe('10 porções');
+  });
+
+  // Um objeto no lugar de um texto era tratado pelo node:sqlite como parâmetros
+  // nomeados, e os valores seguintes escorregavam para a coluna errada.
+  it('recusa um objeto no lugar de um texto, sem chegar ao banco', async () => {
+    const res = await publicar({ tipo: {}, quantidade: VALIDADE_FUTURA, validade: 'X' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toBe('tipo, quantidade e validade são obrigatórios');
+    await nadaFoiCriado();
+  });
+
+  // CA3.1: a doação fica registrada "em nome daquela ONG". Antes, sem nome, ela era
+  // gravada em nome de "ONG"; com nome vazio, em nome de ninguém.
+  it.each([
+    ['sem ONG', {}],
+    ['com ONG vazia', { ong: '' }],
+    ['com ONG só de espaços', { ong: '   ' }],
+    ['com ONG que não é texto', { ong: {} }]
+  ])('recusa aceitar %s, e a doação continua disponível', async (_, corpo) => {
+    const criada = await publicar();
+
+    const res = await request(app).post(`/api/doacoes/${criada.body.id}/aceitar`).send(corpo);
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/nome da ONG/);
+    expect((await repo.buscarPorId(criada.body.id)).status).toBe('disponivel');
+  });
+
+  it('recusa um motivo de retirada que não é texto', async () => {
+    const criada = await publicar();
+
+    const res = await retirar(criada.body.id, { motivo: 'embalagem' });
+
+    expect(res.status).toBe(400);
+    expect((await repo.buscarPorId(criada.body.id)).status).toBe('disponivel');
+  });
+
+  it.each(['abc', '0', '-1', '1.5'])('responde "não encontrada" para o identificador %s', async (id) => {
+    const res = await request(app).post(`/api/doacoes/${id}/coletar`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/não encontrada/);
+  });
+});
+
+describe('robustez do servidor', () => {
+  // Antes, o Express devolvia uma página HTML com o stack trace, e a interface quebrava
+  // ao tentar ler a resposta como JSON.
+  it('responde em JSON quando o corpo da requisição é um JSON malformado', async () => {
+    const res = await request(app)
+      .post('/api/doacoes')
+      .set('Content-Type', 'application/json')
+      .send('{"tipo":');
+
+    expect(res.status).toBe(400);
+    expect(res.headers['content-type']).toMatch(/json/);
+    expect(res.body.erro).toMatch(/JSON/);
+  });
+
+  // ADR 0003: a troca para PostgreSQL deve ficar contida em src/db.js. datetime('now')
+  // só existe no SQLite; se voltar ao repositório, a migração quebra aceite, coleta e
+  // retirada.
+  it('não usa função de data específica do SQLite no repositório', async () => {
+    const { readFileSync } = await import('node:fs');
+    const codigo = readFileSync(new URL('../src/repositorio.js', import.meta.url), 'utf8')
+      .split('\n')
+      .filter((linha) => !linha.trim().startsWith('//'))
+      .join('\n');
+
+    expect(codigo).not.toMatch(/datetime\s*\(/i);
+  });
+
+  it('grava as marcas de hora no mesmo formato de criada_em', async () => {
+    await migrar(); await limparBanco();
+    const criada = await publicar();
+    const res = await aceitar(criada.body.id, 'Amigos do Bem');
+    const formato = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+    expect(res.body.criada_em).toMatch(formato);
+    expect(res.body.aceita_em).toMatch(formato);
+    await encerrar();
+  });
+
+  // Antes, iniciar o servidor de outra pasta (o depurador do VS Code, por exemplo)
+  // dava 404 na página e criava um banco novo e vazio na pasta errada.
+  it('serve a interface mesmo quando iniciado de outra pasta', async () => {
+    const original = process.cwd();
+    const { fileURLToPath } = await import('node:url');
+    process.chdir(fileURLToPath(new URL('../src', import.meta.url)));
+    let outro;
+    try {
+      outro = criarApp();
+    } finally {
+      process.chdir(original);
+    }
+
+    const res = await request(outro).get('/');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/Prato Cheio/);
+  });
+});
+
 describe('garantias no próprio UPDATE (decisão D3)', () => {
   beforeEach(async () => { await migrar(); await limparBanco(); });
   afterAll(async () => { await encerrar(); });

@@ -51,11 +51,12 @@ cai em exatamente uma situação:
 | Coluna | O que conta | Para que serve |
 |---|---|---|
 | Publicadas | todas as doações publicadas na semana | a base |
-| Coletadas | coleta confirmada | o resultado que se quer |
+| Coletadas no prazo | coleta confirmada até o dia da validade | o resultado que se quer |
+| Coletadas após vencer | coleta confirmada depois do dia da validade | contadas à parte: não é comida boa salva |
 | Retiradas | retiradas por serem impróprias (H6c) | saem do cálculo da taxa |
 | Vencidas | disponíveis ou aceitas com a janela já vencida | o desperdício do **Objetivo de Impacto 2** |
 | Em aberto | disponíveis ou aceitas ainda dentro da janela | o que ainda pode ser salvo |
-| Taxa de coleta | coletadas ÷ (publicadas − retiradas) | o indicador do Objetivo 2 |
+| Taxa de coleta | coletadas no prazo ÷ (publicadas − retiradas) | o indicador do Objetivo 2 |
 | Mediana até a coleta | mediana de horas entre publicação e coleta | a medida do **experimento da hipótese** (Objetivo 1) |
 
 | Critério | Dado / Quando / Então |
@@ -66,8 +67,14 @@ cai em exatamente uma situação:
 | CA6b.4 | **Dado** uma semana em que todas as doações foram retiradas, **quando** Marta consulta, **então** a taxa aparece vazia, e não como erro nem como 0% |
 | CA6b.5 | **Dado** doações coletadas com tempos diferentes, **quando** Marta consulta, **então** vê a mediana de horas entre publicação e coleta |
 | CA6b.6 | **Dado** que não há doações, **quando** Marta consulta, **então** recebe um relatório vazio, e não um erro |
+| CA6b.7 | **Dado** uma doação aceita cuja coleta foi confirmada depois do dia da validade, **quando** Marta consulta, **então** ela aparece em "coletadas após vencer" e fica fora da taxa de coleta |
 
 Decisões de comportamento:
+- **A coleta depois da validade é permitida, mas contada à parte.** Bloquear impediria a
+  ONG que buscou a tempo e só confirmou depois; contar como sucesso mostraria como comida
+  salva um alimento que pode ter sido buscado vencido. Na lista "aguardando coleta", a
+  doação vencida aparece com um aviso para confirmar só se a busca foi feita no prazo. O
+  dia da coleta é comparado no fuso local, o mesmo da validade.
 - **As retiradas não entram na taxa.** Alimento impróprio não é comida boa desperdiçada, e
   contá-lo puniria a taxa justamente quando o sistema agiu certo.
 - **Mediana, e não média.** Uma única coleta muito atrasada puxaria a média para cima sem

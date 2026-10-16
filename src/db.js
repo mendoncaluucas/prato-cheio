@@ -7,9 +7,13 @@
 // `node:sqlite` é módulo embutido do Node 22+. Carregado via createRequire porque
 // algumas ferramentas (como o Vite/Vitest) ainda não o reconhecem como embutido.
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
-const ARQUIVO = process.env.DATABASE_FILE || 'dados.sqlite';
+// Sem DATABASE_FILE, o banco fica na raiz do projeto, resolvida a partir deste arquivo.
+// Um caminho relativo dependeria da pasta de onde o servidor foi iniciado e, rodando de
+// outro lugar, criaria um banco novo e vazio, como se os dados tivessem sumido.
+const ARQUIVO = process.env.DATABASE_FILE || fileURLToPath(new URL('../dados.sqlite', import.meta.url));
 
 let db;
 
