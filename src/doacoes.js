@@ -47,6 +47,9 @@ export async function aceitar(id, ong) {
   if (!doacao) {
     throw new Error('doação não encontrada');
   }
+  if (doacao.status === 'retirada') {
+    throw new Error('esta doação foi retirada da lista por ser imprópria');
+  }
   if (doacao.status !== 'disponivel') {
     throw new Error('doação já foi aceita por outra ONG');
   }
@@ -65,6 +68,33 @@ export async function aceitar(id, ong) {
   return atualizada;
 }
 
+// H6c — quem administra a plataforma retira da lista uma doação denunciada como
+// imprópria, para que nenhuma ONG busque alimento fora das condições.
+// O motivo é obrigatório: é o registro que a vigilância sanitária pode cobrar.
+export async function retirar(id, motivo) {
+  if (!motivo || !String(motivo).trim()) {
+    throw new Error('informe o motivo da retirada');
+  }
+  const doacao = await repo.buscarPorId(id);
+  if (!doacao) {
+    throw new Error('doação não encontrada');
+  }
+  if (doacao.status === 'retirada') {
+    throw new Error('esta doação já foi retirada');
+  }
+  if (doacao.status === 'coletada') {
+    throw new Error('não é possível retirar uma doação que já foi coletada');
+  }
+
+  const atualizada = await repo.retirar(id, String(motivo).trim());
+  // Se não voltou linha, a doação mudou de estado entre a busca e a escrita —
+  // foi coletada ou retirada por outra pessoa no meio do caminho.
+  if (!atualizada) {
+    throw new Error('a doação mudou de estado e não pôde ser retirada; atualize a lista');
+  }
+  return atualizada;
+}
+
 // ADR 0001 — a ONG confirma que buscou a doação. Fecha o ciclo de vida
 // disponivel → aceita → coletada e registra a hora da coleta, que o experimento da
 // hipótese e o Objetivo de Impacto 1 precisam medir.
@@ -75,6 +105,9 @@ export async function coletar(id) {
   }
   if (doacao.status === 'coletada') {
     throw new Error('a coleta desta doação já foi confirmada');
+  }
+  if (doacao.status === 'retirada') {
+    throw new Error('esta doação foi retirada da lista por ser imprópria e não deve ser buscada');
   }
   if (doacao.status !== 'aceita') {
     throw new Error('só é possível confirmar a coleta de uma doação aceita');

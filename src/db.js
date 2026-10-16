@@ -43,14 +43,16 @@ export async function migrar() {
       ong         TEXT,
       criada_em   TEXT NOT NULL DEFAULT (datetime('now')),
       aceita_em   TEXT,
-      coletada_em TEXT
+      coletada_em TEXT,
+      retirada_em TEXT,
+      motivo_retirada TEXT
     )
   `);
 
-  // Colunas acrescentadas na Unidade 2 (ADR 0001). O CREATE TABLE acima não altera
+  // Colunas acrescentadas na Unidade 2 (ADR 0001 e H6c). O CREATE TABLE acima não altera
   // uma tabela que já existe, então um dados.sqlite criado antes recebe as colunas aqui.
   const existentes = conexao().prepare('PRAGMA table_info(doacoes)').all().map((c) => c.name);
-  for (const coluna of ['aceita_em', 'coletada_em']) {
+  for (const coluna of ['aceita_em', 'coletada_em', 'retirada_em', 'motivo_retirada']) {
     if (!existentes.includes(coluna)) {
       conexao().exec(`ALTER TABLE doacoes ADD COLUMN ${coluna} TEXT`);
     }
