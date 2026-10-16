@@ -41,6 +41,14 @@ export function criarApp() {
     }
   });
 
+  app.get('/api/relatorios/semanal', async (req, res) => {
+    try {
+      res.json(await doacoes.relatorioSemanal());
+    } catch (erro) {
+      res.status(400).json({ erro: erro.message });
+    }
+  });
+
   app.post('/api/doacoes/:id/retirar', async (req, res) => {
     try {
       res.json(await doacoes.retirar(req.params.id, req.body?.motivo));
