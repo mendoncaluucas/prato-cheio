@@ -3,6 +3,7 @@ import request from 'supertest';
 import { criarApp } from '../src/app.js';
 import { migrar, limparBanco, encerrar, conexao } from '../src/db.js';
 import * as repo from '../src/repositorio.js';
+import { montarRelatorioSemanal } from '../src/doacoes.js';
 
 const app = criarApp();
 
@@ -375,6 +376,134 @@ describe('retirar doação denunciada (H6c)', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.erro).toMatch(/não encontrada/);
+  });
+});
+
+// Grava uma doação com as marcas de hora escolhidas pelo teste, no formato UTC que o
+// banco usa ('AAAA-MM-DD HH:MM:SS'). Pela API as horas seriam sempre "agora".
+function doacaoEm(criadaEm, { status = 'disponivel', coletadaEm = null, validade = VALIDADE_FUTURA } = {}) {
+  conexao().prepare(
+    `INSERT INTO doacoes (tipo, quantidade, validade, status, criada_em, coletada_em)
+     VALUES ('Sopa', '10', ?, ?, ?, ?)`
+  ).run(validade, status, criadaEm, coletadaEm);
+}
+
+function relatorio() {
+  return request(app).get('/api/relatorios/semanal');
+}
+
+describe('relatório semanal (H6b)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  // CA6b.1
+  // Dado doações publicadas em semanas diferentes
+  // Quando Marta consulta o relatório
+  // Então há uma linha por semana, identificada pela segunda-feira, da mais recente para a mais antiga
+  it('agrupa por semana, da mais recente para a mais antiga', async () => {
+    doacaoEm('2026-10-05 10:00:00'); // segunda
+    doacaoEm('2026-10-11 20:00:00'); // domingo da mesma semana
+    doacaoEm('2026-10-12 09:00:00'); // segunda seguinte
+
+    const res = await relatorio();
+
+    expect(res.status).toBe(200);
+    expect(res.body.map((s) => s.semana)).toEqual(['2026-10-12', '2026-10-05']);
+    expect(res.body[1].publicadas).toBe(2);
+  });
+
+  // CA6b.2
+  // Dado doações em todas as situações possíveis numa mesma semana
+  // Quando Marta consulta o relatório
+  // Então cada doação aparece em exatamente uma situação, e as situações somam as publicadas
+  it('conta cada doação em uma única situação', async () => {
+    doacaoEm('2026-10-05 10:00:00', { status: 'coletada', coletadaEm: '2026-10-05 12:00:00' });
+    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+    doacaoEm('2026-10-05 10:00:00', { status: 'disponivel', validade: VALIDADE_VENCIDA });
+    doacaoEm('2026-10-05 10:00:00', { status: 'aceita', validade: VALIDADE_VENCIDA });
+    doacaoEm('2026-10-05 10:00:00', { status: 'disponivel' });
+
+    const [s] = (await relatorio()).body;
+
+    expect(s).toMatchObject({ publicadas: 5, coletadas: 1, retiradas: 1, vencidasSemColeta: 2, emAberto: 1 });
+    expect(s.coletadas + s.retiradas + s.vencidasSemColeta + s.emAberto).toBe(s.publicadas);
+  });
+
+  // CA6b.3
+  // Dado uma semana com doações retiradas por serem impróprias
+  // Quando a taxa de coleta é calculada
+  // Então as retiradas ficam fora do denominador
+  it('calcula a taxa de coleta sem contar as retiradas', async () => {
+    doacaoEm('2026-10-05 10:00:00', { status: 'coletada', coletadaEm: '2026-10-05 11:00:00' });
+    doacaoEm('2026-10-05 10:00:00', { status: 'disponivel', validade: VALIDADE_VENCIDA });
+    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+
+    const [s] = (await relatorio()).body;
+
+    expect(s.taxaColeta).toBe(50); // 1 coletada de 2 consideradas, não de 4 publicadas
+  });
+
+  // CA6b.4 — situação de erro: sem denominador, não há taxa
+  it('não calcula taxa quando todas as doações da semana foram retiradas', async () => {
+    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+
+    const [s] = (await relatorio()).body;
+
+    expect(s.taxaColeta).toBeNull();
+  });
+
+  // Pela API, um 0/0 sem proteção viraria NaN e o JSON o transformaria em null, e o
+  // teste acima passaria do mesmo jeito. Chamando a função direto, a diferença aparece.
+  it('devolve null, e não NaN, para a taxa sem denominador', () => {
+    const [s] = montarRelatorioSemanal(
+      [{ criada_em: '2026-10-05 10:00:00', status: 'retirada', validade: '2026-12-31', coletada_em: null }],
+      '2026-10-16'
+    );
+
+    expect(s.taxaColeta).toBeNull();
+  });
+
+  // CA6b.5
+  // Dado doações coletadas com tempos diferentes desde a publicação
+  // Quando Marta consulta o relatório
+  // Então ela vê a mediana de horas entre publicação e coleta, a medida do experimento da hipótese
+  it('mostra a mediana de horas entre publicação e coleta', async () => {
+    doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-05 09:00:00' }); // 1 h
+    doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-05 11:00:00' }); // 3 h
+    doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-06 08:00:00' }); // 24 h
+    doacaoEm('2026-10-05 08:00:00', { status: 'disponivel' }); // sem coleta: fora da mediana
+
+    const [s] = (await relatorio()).body;
+
+    expect(s.medianaHorasAteColeta).toBe(3); // e não a média, que daria 9,3
+  });
+
+  it('não mostra mediana numa semana sem coletas', async () => {
+    doacaoEm('2026-10-05 08:00:00');
+
+    const [s] = (await relatorio()).body;
+
+    expect(s.medianaHorasAteColeta).toBeNull();
+    expect(s.taxaColeta).toBe(0);
+  });
+
+  // CA6b.6 — situação de borda: sem doações, o relatório vem vazio, não com erro
+  it('devolve lista vazia quando não há doações', async () => {
+    const res = await relatorio();
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  // A semana é a da hora gravada, em UTC (limitação registrada no ADR 0006)
+  it('separa domingo 23h59 e segunda 00h00 em semanas diferentes', async () => {
+    doacaoEm('2026-10-11 23:59:59');
+    doacaoEm('2026-10-12 00:00:00');
+
+    const res = await relatorio();
+
+    expect(res.body).toHaveLength(2);
   });
 });
 

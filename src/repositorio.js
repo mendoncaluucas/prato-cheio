@@ -60,6 +60,16 @@ export async function aceitar(id, ong) {
   return rows[0];
 }
 
+// H6b — os dados de que o relatório semanal precisa, sem agrupar.
+// O agrupamento por semana fica em doacoes.js de propósito (ADR 0006): as funções de
+// data do SQLite e do PostgreSQL são diferentes, e esta consulta funciona igual nos dois.
+export async function listarParaRelatorio() {
+  const { rows } = await query(
+    `SELECT criada_em, status, validade, coletada_em FROM doacoes ORDER BY criada_em`
+  );
+  return rows;
+}
+
 // H6c — retira uma doação denunciada como imprópria e devolve a linha atualizada.
 // Só vale para doação ainda não entregue (disponível ou aceita). A condição fica no
 // próprio UPDATE pelo mesmo motivo do aceite: uma retirada e uma confirmação de coleta
