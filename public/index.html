@@ -17,6 +17,7 @@
     .aviso[hidden] { display: none; }
     .aviso.erro { background: #fde8e8; border: 1px solid #f5b5b5; color: #8a1c1c; }
     .aviso.ok { background: #e6f4ea; border: 1px solid #b7dfc4; color: #1b5e2a; }
+    .vencida { display: block; font-size: .8rem; color: #8a1c1c; margin-top: .2rem; }
     .nota { font-size: .85rem; color: #555; margin: -.4rem 0 .6rem; }
     .tabela { overflow-x: auto; }
     table { border-collapse: collapse; width: 100%; font-size: .85rem; }
@@ -48,12 +49,12 @@
   <ul id="aguardando"></ul>
 
   <h2>Relatório semanal</h2>
-  <p class="nota">Semana de publicação, começando na segunda-feira. A taxa de coleta não conta as doações retiradas.</p>
+  <p class="nota">Semana de publicação, começando na segunda-feira. A taxa de coleta conta só as coletadas no prazo e não conta as doações retiradas.</p>
   <div class="tabela">
     <table>
       <thead>
         <tr>
-          <th>Semana</th><th>Publicadas</th><th>Coletadas</th><th>Retiradas</th>
+          <th>Semana</th><th>Publicadas</th><th>Coletadas no prazo</th><th>Coletadas após vencer</th><th>Retiradas</th>
           <th>Vencidas</th><th>Em aberto</th><th>Taxa de coleta</th><th>Mediana até a coleta</th>
         </tr>
       </thead>
@@ -76,14 +77,13 @@
       const corpo = document.getElementById('relatorio');
       corpo.innerHTML = '';
       if (!semanas.length) {
-        corpo.innerHTML = '<tr><td colspan="8">Nenhuma doação publicada ainda.</td></tr>';
+        corpo.innerHTML = '<tr><td colspan="9">Nenhuma doação publicada ainda.</td></tr>';
         return;
       }
       for (const s of semanas) {
-        const [ano, mes, dia] = s.semana.split('-');
         const celulas = [
-          `${dia}/${mes}/${ano}`,
-          s.publicadas, s.coletadas, s.retiradas, s.vencidasSemColeta, s.emAberto,
+          dataBR(s.semana),
+          s.publicadas, s.coletadas, s.coletadasAposVencimento, s.retiradas, s.vencidasSemColeta, s.emAberto,
           s.taxaColeta === null ? '—' : `${s.taxaColeta}%`,
           s.medianaHorasAteColeta === null ? '—' : `${s.medianaHorasAteColeta} h`
         ];
@@ -107,9 +107,16 @@
       for (const d of doacoes) {
         const li = document.createElement('li');
         li.textContent = `${d.tipo} — ${d.quantidade} · aceita por ${d.ong} `;
+        if (d.validade < hojeLocal()) {
+          const alerta = document.createElement('span');
+          alerta.className = 'vencida';
+          alerta.textContent = `venceu em ${dataBR(d.validade)}: confirme só se a busca foi feita no prazo `;
+          li.appendChild(alerta);
+        }
         const botao = document.createElement('button');
         botao.textContent = 'Confirmar coleta';
         botao.onclick = async () => {
+          botao.disabled = true;
           const res = await fetch(`/api/doacoes/${d.id}/coletar`, { method: 'POST' });
           const corpo = await res.json();
           if (res.ok) {
@@ -138,6 +145,7 @@
         const botao = document.createElement('button');
         botao.textContent = 'Aceitar';
         botao.onclick = async () => {
+          botao.disabled = true;
           const res = await fetch(`/api/doacoes/${d.id}/aceitar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -169,6 +177,7 @@
       botao.onclick = async () => {
         const motivo = prompt(`Motivo da retirada de "${d.tipo}":`);
         if (motivo === null) return; // cancelou
+        botao.disabled = true;
         const res = await fetch(`/api/doacoes/${d.id}/retirar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -183,6 +192,17 @@
         carregar();
       };
       return botao;
+    }
+
+    // Mesmo formato e fuso da validade (AAAA-MM-DD, horário local).
+    function hojeLocal() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function dataBR(aaaammdd) {
+      const [ano, mes, dia] = aaaammdd.split('-');
+      return `${dia}/${mes}/${ano}`;
     }
 
     function avisar(mensagem, tipo) {

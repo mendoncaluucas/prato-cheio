@@ -5,14 +5,21 @@
 //   const { rows } = await query('SELECT * FROM doacoes WHERE id = ?', [id]);
 import { query } from './db.js';
 
+// Hora atual em UTC, no formato 'AAAA-MM-DD HH:MM:SS' usado em todas as marcas de hora.
+// Gerada aqui, e não com datetime('now'), para o SQL deste arquivo valer igual no
+// SQLite e no PostgreSQL: a troca de banco do ADR 0003 fica contida em src/db.js.
+function agora() {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // Insere a doação e devolve a linha criada.
 // O status 'disponivel' vem do DEFAULT do schema.
 export async function inserir({ tipo, quantidade, validade }) {
   const { rows } = await query(
-    `INSERT INTO doacoes (tipo, quantidade, validade)
-     VALUES (?, ?, ?)
+    `INSERT INTO doacoes (tipo, quantidade, validade, criada_em)
+     VALUES (?, ?, ?, ?)
      RETURNING *`,
-    [tipo, quantidade, validade]
+    [tipo, quantidade, validade, agora()]
   );
   return rows[0];
 }
@@ -52,10 +59,10 @@ export async function buscarPorId(id) {
 export async function aceitar(id, ong) {
   const { rows } = await query(
     `UPDATE doacoes
-        SET status = 'aceita', ong = ?, aceita_em = datetime('now')
+        SET status = 'aceita', ong = ?, aceita_em = ?
       WHERE id = ? AND status = 'disponivel'
      RETURNING *`,
-    [ong, id]
+    [ong, agora(), id]
   );
   return rows[0];
 }
@@ -77,10 +84,10 @@ export async function listarParaRelatorio() {
 export async function retirar(id, motivo) {
   const { rows } = await query(
     `UPDATE doacoes
-        SET status = 'retirada', motivo_retirada = ?, retirada_em = datetime('now')
+        SET status = 'retirada', motivo_retirada = ?, retirada_em = ?
       WHERE id = ? AND status IN ('disponivel', 'aceita')
      RETURNING *`,
-    [motivo, id]
+    [motivo, agora(), id]
   );
   return rows[0];
 }
@@ -91,10 +98,10 @@ export async function retirar(id, motivo) {
 export async function coletar(id) {
   const { rows } = await query(
     `UPDATE doacoes
-        SET status = 'coletada', coletada_em = datetime('now')
+        SET status = 'coletada', coletada_em = ?
       WHERE id = ? AND status = 'aceita'
      RETURNING *`,
-    [id]
+    [agora(), id]
   );
   return rows[0];
 }
