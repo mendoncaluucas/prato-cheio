@@ -2,6 +2,9 @@
 
 - **Data:** 21/09/2026
 - **Status:** aceito
+- **Revisto em:** 08/10/2026 ([ADR 0005](0005-reavaliacao-postgresql-varias-cidades.md)) —
+  mantido para o piloto acadêmico. Deve ser substituído se o sistema passar a ser usado
+  de verdade por mais de uma cidade.
 
 ## Contexto
 O `src/db.js` já foi desenhado para isolar a troca de banco (SQLite → PostgreSQL) atrás

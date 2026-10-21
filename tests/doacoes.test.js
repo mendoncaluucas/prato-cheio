@@ -37,6 +37,10 @@ function coletar(id) {
   return request(app).post(`/api/doacoes/${id}/coletar`).send();
 }
 
+function retirar(id, motivo) {
+  return request(app).post(`/api/doacoes/${id}/retirar`).send({ motivo });
+}
+
 // Uma doação que venceu depois de publicada. Pela API isso é impossível de montar —
 // a RNI1 recusa publicar com validade no passado —, então o teste grava direto pelo
 // repositório, como se a doação tivesse sido publicada dias atrás.
@@ -272,6 +276,149 @@ describe('confirmar a coleta (ADR 0001)', () => {
   });
 });
 
+describe('retirar doação denunciada (H6c)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  // CA6c.1
+  // Dado uma doação disponível denunciada como imprópria
+  // Quando quem administra a retira informando o motivo
+  // Então ela passa a retirada, some da lista e o motivo e a hora ficam registrados
+  it('retira uma doação disponível e registra o motivo e a hora', async () => {
+    const criada = await publicar();
+
+    const res = await retirar(criada.body.id, 'embalagem violada');
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('retirada');
+    expect(res.body.motivo_retirada).toBe('embalagem violada');
+    expect(res.body.retirada_em).toBeTruthy();
+    const lista = await request(app).get('/api/doacoes');
+    expect(lista.body).toHaveLength(0);
+  });
+
+  // CA6c.2
+  // Dado uma doação já aceita por uma ONG, mas ainda não coletada
+  // Quando quem administra a retira
+  // Então ela sai de "aguardando coleta" e a ONG não consegue mais confirmar a coleta
+  it('retira uma doação aceita e impede a coleta', async () => {
+    const criada = await publicar();
+    await aceitar(criada.body.id, 'Amigos do Bem');
+
+    await retirar(criada.body.id, 'fora da temperatura adequada');
+
+    const aguardando = await request(app).get('/api/doacoes/aceitas');
+    expect(aguardando.body).toHaveLength(0);
+    const res = await coletar(criada.body.id);
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/retirada/);
+  });
+
+  // CA6c.3
+  // Dado uma doação disponível
+  // Quando quem administra tenta retirá-la sem informar o motivo
+  // Então a API recusa com 400 e a doação continua disponível
+  it('recusa retirar sem motivo', async () => {
+    const criada = await publicar();
+
+    const semMotivo = await retirar(criada.body.id);
+    const emBranco = await retirar(criada.body.id, '   ');
+
+    expect(semMotivo.status).toBe(400);
+    expect(emBranco.status).toBe(400);
+    expect(semMotivo.body.erro).toMatch(/motivo/);
+    const lista = await request(app).get('/api/doacoes');
+    expect(lista.body).toHaveLength(1);
+  });
+
+  // CA6c.4
+  // Dado uma doação já coletada
+  // Quando quem administra tenta retirá-la
+  // Então a API recusa com 400, porque o alimento já foi entregue
+  it('recusa retirar uma doação que já foi coletada', async () => {
+    const criada = await publicar();
+    await aceitar(criada.body.id, 'Amigos do Bem');
+    await coletar(criada.body.id);
+
+    const res = await retirar(criada.body.id, 'denúncia tardia');
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/coletada/);
+  });
+
+  // CA6c.5
+  it('recusa retirar duas vezes, mantendo o primeiro motivo', async () => {
+    const criada = await publicar();
+    await retirar(criada.body.id, 'embalagem violada');
+
+    const res = await retirar(criada.body.id, 'outro motivo');
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/já foi retirada/);
+    const doacao = await repo.buscarPorId(criada.body.id);
+    expect(doacao.motivo_retirada).toBe('embalagem violada');
+  });
+
+  // CA6c.6
+  it('recusa aceitar uma doação retirada, dizendo o motivo real', async () => {
+    const criada = await publicar();
+    await retirar(criada.body.id, 'embalagem violada');
+
+    const res = await aceitar(criada.body.id, 'Amigos do Bem');
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/retirada/);
+  });
+
+  it('recusa retirar uma doação que não existe', async () => {
+    const res = await retirar(9999, 'qualquer');
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/não encontrada/);
+  });
+});
+
+// Decisão D3: a condição de status fica no próprio UPDATE. Pela API, a verificação de
+// doacoes.js barra esses casos antes, então a condição do banco só agiria numa corrida
+// real entre duas requisições. Estes testes chamam o repositório direto, sem a
+// verificação, para provar que o banco sozinho também recusa.
+describe('garantias no próprio UPDATE (decisão D3)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  it('o UPDATE do aceite não altera uma doação que já não está disponível', async () => {
+    const criada = await publicar();
+    await repo.aceitar(criada.body.id, 'Amigos do Bem');
+
+    const segunda = await repo.aceitar(criada.body.id, 'Outra ONG');
+
+    expect(segunda).toBeUndefined();
+    expect((await repo.buscarPorId(criada.body.id)).ong).toBe('Amigos do Bem');
+  });
+
+  it('o UPDATE da coleta não altera uma doação que já foi coletada', async () => {
+    const criada = await publicar();
+    await repo.aceitar(criada.body.id, 'Amigos do Bem');
+    const primeira = await repo.coletar(criada.body.id);
+
+    const segunda = await repo.coletar(criada.body.id);
+
+    expect(segunda).toBeUndefined();
+    expect((await repo.buscarPorId(criada.body.id)).coletada_em).toBe(primeira.coletada_em);
+  });
+
+  it('o UPDATE da retirada não altera uma doação já coletada', async () => {
+    const criada = await publicar();
+    await repo.aceitar(criada.body.id, 'Amigos do Bem');
+    await repo.coletar(criada.body.id);
+
+    const retirada = await repo.retirar(criada.body.id, 'denúncia tardia');
+
+    expect(retirada).toBeUndefined();
+    expect((await repo.buscarPorId(criada.body.id)).status).toBe('coletada');
+  });
+});
+
 describe('migração do banco (ADR 0001)', () => {
   afterAll(async () => { await encerrar(); });
 
@@ -294,5 +441,7 @@ describe('migração do banco (ADR 0001)', () => {
     const colunas = conexao().prepare('PRAGMA table_info(doacoes)').all().map((c) => c.name);
     expect(colunas).toContain('aceita_em');
     expect(colunas).toContain('coletada_em');
+    expect(colunas).toContain('retirada_em');
+    expect(colunas).toContain('motivo_retirada');
   });
 });
