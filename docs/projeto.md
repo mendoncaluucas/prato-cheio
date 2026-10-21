@@ -141,10 +141,49 @@ A decisão D3 não tem ADR próprio: ela foi tomada durante o walking skeleton d
 e está documentada aqui e no comentário de `aceitar()`, em `src/repositorio.js`.
 
 ## Requisitos não-funcionais
-| Requisito | Como afeta o design |
-|---|---|
+
+Os três requisitos vêm das restrições e dos stakeholders levantados no `docs/analise.md`.
+Cada um mudou uma decisão concreta do projeto.
+
+| # | Requisito | Origem na Análise | Como afeta o design |
+|---|---|---|---|
+| RNF1 | **Integridade sob acesso simultâneo:** duas ONGs nunca ficam com a mesma doação, e uma doação coletada ou retirada não muda mais de estado | RNI2 ("quem chega primeiro leva") e risco R2 | decisão **D3**: toda mudança de status leva a condição no próprio `UPDATE` (aceitar, coletar e retirar), e a verificação em `doacoes.js` serve para dar a mensagem certa |
+| RNF2 | **Uso no navegador do celular, com conexão instável:** os voluntários e as ONGs operam na rua, sem instalar nada | stakeholder "voluntários entregadores" e restrição do caso | interface numa página só, sem bibliotecas nem etapa de build (cerca de 9 KB); toda recusa da API aparece na tela; os botões travam durante a requisição para que uma resposta lenta não gere um segundo aceite |
+| RNF3 | **Rastreabilidade sanitária mínima:** saber o quê, quanto, até quando e o que aconteceu com cada doação | stakeholder "vigilância sanitária" e conflito principal | três campos obrigatórios (RN1), validade em data real; a hora de cada etapa é gravada (`criada_em`, `aceita_em`, `coletada_em`, `retirada_em`) e a retirada exige motivo (H6c) |
+
+### Como cada requisito pesou nas decisões
+
+- **RNF1 → D3 e H6c.** Sem o requisito, bastaria verificar o status antes de gravar. Com
+  ele, a condição precisa estar no `UPDATE`, porque duas requisições podem passar pela
+  verificação ao mesmo tempo. A H6c reaproveitou a mesma proteção: a retirada só vale para
+  doação `disponivel` ou `aceita`, e isso também está no `UPDATE`.
+- **RNF2 → interface simples.** Um framework de interface exigiria baixar dezenas de
+  quilobytes a mais e uma etapa de build. Para três ações e duas listas, uma página com
+  `fetch` resolve, e carrega rápido mesmo com sinal fraco.
+- **RNF3 → o que é obrigatório.** O conflito entre doador e vigilância (análise) foi
+  resolvido com o mínimo de campos obrigatórios. As marcas de hora não pesam para o
+  doador, porque são gravadas pelo sistema, e dão à vigilância o histórico de cada doação.
+  Elas também alimentam o relatório semanal (H6b).
+
+### Limitação conhecida (RNF2)
+
+A interface **não trata a queda da conexão**. Se a rede cair no meio de um clique, a
+requisição falha sem mensagem, e o botão fica travado até a página ser recarregada. As
+recusas da API aparecem; a falta de resposta, não. A correção é tratar a falha de rede em
+cada chamada, mostrando um aviso e destravando o botão.
 
 ## Critérios de validação do projeto
+
+Como verificamos que as decisões funcionam:
+
+| O que | Como foi verificado | Onde |
+|---|---|---|
+| Critérios de aceite das histórias (H1–H3, H6b, H6c) | um teste automatizado por critério, rodando no CI a cada PR | `tests/doacoes.test.js` |
+| RNF1 — integridade sob acesso simultâneo | testes que chamam o repositório direto, sem a verificação da aplicação, e conferem que o `UPDATE` sozinho recusa a segunda mudança | bloco `garantias no próprio UPDATE (decisão D3)` |
+| RNF3 — dados mínimos e confiáveis | testes de entrada inválida: campos vazios, validade fora do formato, ONG ausente | bloco `validação de entrada` |
+| Os testes testam de verdade | cada regra foi removida de propósito, e o teste correspondente teve de falhar | registrado nos PRs #12, #14 e #15 |
+| A migração para PostgreSQL continua contida em `db.js` | teste que falha se o repositório voltar a usar função de data do SQLite | bloco `robustez do servidor` |
+| O sistema sobe | o CI inicia a aplicação e chama `/api/saude` | `.github/workflows/ci.yml` |
 
 ## Uso de IA
 
