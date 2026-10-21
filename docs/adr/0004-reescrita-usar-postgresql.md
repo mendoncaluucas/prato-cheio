@@ -39,7 +39,7 @@ dados e **este** código.
 
 1. **PostgreSQL**
    - Prós: relacional, adequado a uma tabela de campos fixos; suporta `RETURNING`, que o
-     `src/repositorio.js` usa em três consultas (inserir, aceitar e coletar); o `UPDATE`
+     `src/repositorio.js` usa em quatro consultas (inserir, aceitar, retirar e coletar); o `UPDATE`
      condicional da decisão D3 trava só a linha disputada; tem tipo `DATE` para a
      validade; o `ci.yml` já traz o serviço `postgres` pronto; é o banco que a disciplina
      exige.
@@ -48,7 +48,7 @@ dados e **este** código.
 2. **MySQL**
    - Prós: relacional, cliente-servidor e muito usado.
    - Contras: não suporta `RETURNING` — cada inserção e cada mudança de status passaria a
-     precisar de uma segunda consulta para devolver a linha, e as três funções do
+     precisar de uma segunda consulta para devolver a linha, e as quatro funções do
      repositório teriam de ser reescritas; não atende a exigência da disciplina.
 3. **MongoDB (banco de documentos)**
    - Prós: esquema flexível; atualização atômica de um documento com filtro, o que também
@@ -79,7 +79,7 @@ fixos, com mudança de status disputada e consultas que já usam `RETURNING`.
 - **Negativas / o que abrimos mão:** um servidor de banco passa a ser necessário para
   rodar e testar a aplicação; perde-se a simplicidade do arquivo local.
 - **Riscos e o que fazer se der errado:** consultas que dependem de comportamento
-  específico do SQLite podem falhar na troca. Os 18 testes rodando contra o PostgreSQL no
+  específico do SQLite podem falhar na troca. A suíte de testes rodando contra o PostgreSQL no
   CI mostram o que quebrou antes de a mudança chegar à `main`.
 
 ### Rastreabilidade

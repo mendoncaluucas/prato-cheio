@@ -39,14 +39,32 @@ O que pesa agora:
 2. **Migrar para PostgreSQL.**
    - Prós: atende a disciplina; banco cliente-servidor que vários processos compartilham;
      trava por linha, e não pelo banco inteiro; suporta `RETURNING`, que o
-     `src/repositorio.js` já usa em três consultas; o CI já tem o serviço preparado.
+     `src/repositorio.js` já usa em quatro consultas; o CI já tem o serviço preparado.
    - Contras: exige um servidor de banco acessível (resolvido pelo ADR 0002); a troca
-     precisa ser feita sem quebrar os 18 testes existentes.
+     precisa ser feita sem quebrar a suíte de testes existente.
 3. **Migrar para MySQL.**
    - Prós: também é cliente-servidor e muito difundido.
    - Contras: não atende a exigência da disciplina; não suporta `RETURNING`, o que obrigaria
-     a reescrever as três consultas do repositório que dependem dele (inserir, aceitar e
-     coletar) com uma segunda leitura após cada escrita.
+     a reescrever as quatro consultas do repositório que dependem dele (inserir, aceitar,
+     retirar e coletar) com uma segunda leitura após cada escrita.
+
+## Trade-offs
+
+| Critério | 1. Manter SQLite | 2. PostgreSQL | 3. MySQL |
+|---|---|---|---|
+| Atende a exigência da Unidade 3 | **não** | **sim** | não |
+| Banco compartilhado pelo grupo e por mais de um servidor | **não** — um arquivo por máquina | **sim** | sim |
+| Escritas simultâneas | um escritor por vez no banco inteiro | trava só a linha alterada | trava só a linha alterada |
+| Mudança no código atual | **nenhuma** | só o marcador de parâmetro, contido em `src/db.js` | reescrever as quatro consultas com `RETURNING` |
+| Instalação e custo | **nada a instalar** | servidor de banco (ADR 0002: serviço gerenciado gratuito) | servidor de banco |
+| Funciona sem internet | **sim** | não, com o ADR 0002 | depende de onde rodar |
+| Estabilidade do módulo usado | `node:sqlite` ainda **experimental** | estável | estável |
+
+O SQLite ganha onde o piloto é pequeno: zero instalação, zero mudança e funcionamento
+offline. Ele perde no que o projeto precisa daqui para a frente: um banco compartilhado, a
+exigência da disciplina e um módulo que não é experimental. Entre os bancos cliente-servidor,
+a diferença decisiva não é desempenho nem popularidade, e sim o custo de migrar **o código
+que já existe**.
 
 ## Decisão
 
@@ -72,7 +90,7 @@ manteve.
   deixa de bastar.
 - **Riscos e o que fazer se der errado:** diferenças de SQL entre os dois bancos, como o
   marcador de parâmetro (`?` no SQLite, `$1` no PostgreSQL), podem quebrar consultas. A
-  mitigação é fazer a troca só no `src/db.js`, rodar os 18 testes contra o PostgreSQL no
+  mitigação é fazer a troca só no `src/db.js`, rodar a suíte de testes contra o PostgreSQL no
   CI e só então ligar o banco do ambiente de desenvolvimento.
 
 ## Rastreabilidade
