@@ -84,7 +84,19 @@ nenhuma regra de negócio conhece a origem do banco.
 - **D3 → RNI2 e critério CA3.2.** A regra diz que, entre duas ONGs, a primeira registrada fica com a doação e a segunda recebe recusa explícita. Verificar antes e gravar depois deixa uma janela entre a leitura e a escrita em que as duas passam pela verificação. Colocar a condição no `UPDATE` elimina a janela: a decisão de quem chega primeiro passa a ser do banco, em uma única operação.
 
 ## Diagramas
-(contexto + dados ou componentes — em `docs/` ou como imagem)
+
+Os diagramas ficam em [`docs/diagramas/`](diagramas/README.md), em Mermaid. Cada um responde
+a uma pergunta diferente e expõe uma decisão de projeto:
+
+| Diagrama | Pergunta | Decisão |
+|---|---|---|
+| [Estados](diagramas/estados.md) | Por quais estados uma doação passa, e o que a faz mudar? | D1 / [ADR 0001](adr/0001-escopo-unidade-2.md) e a H6c |
+| [Sequência](diagramas/sequencia.md) | Como as camadas colaboram quando duas ONGs aceitam a mesma doação? | D3 |
+
+A primeira versão foi gerada por IA e revisada pelo grupo. A
+[análise crítica](diagramas/analise-critica.md) registra os quatro problemas encontrados —
+entre eles, um estado "vencida" que não existe no banco e uma transição da RNI3, adiada pelo
+ADR 0001, desenhada como se estivesse implementada.
 
 ## ADRs
 
