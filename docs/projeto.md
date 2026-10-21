@@ -36,6 +36,46 @@ Decisões de comportamento:
 - **Limitação:** o sistema não tem login, então qualquer pessoa consegue chamar a rota de
   retirada. "Quem administra" ainda não é um papel controlado pelo sistema.
 
+### H6b — relatório semanal de coletas
+
+> Como **Marta**, quero ver, a cada semana, quantas das doações publicadas terminaram
+> coletadas, para saber se o piloto está reduzindo o desperdício.
+
+Rota: `GET /api/relatorios/semanal`. Na interface, a tabela *Relatório semanal* fica abaixo
+das listas e é atualizada a cada ação. Por que o agrupamento é feito na aplicação, e não em
+SQL: [ADR 0006](adr/0006-relatorio-semanal-na-aplicacao.md).
+
+Cada linha é uma **semana de publicação**, identificada pela segunda-feira. Cada doação
+cai em exatamente uma situação:
+
+| Coluna | O que conta | Para que serve |
+|---|---|---|
+| Publicadas | todas as doações publicadas na semana | a base |
+| Coletadas | coleta confirmada | o resultado que se quer |
+| Retiradas | retiradas por serem impróprias (H6c) | saem do cálculo da taxa |
+| Vencidas | disponíveis ou aceitas com a janela já vencida | o desperdício do **Objetivo de Impacto 2** |
+| Em aberto | disponíveis ou aceitas ainda dentro da janela | o que ainda pode ser salvo |
+| Taxa de coleta | coletadas ÷ (publicadas − retiradas) | o indicador do Objetivo 2 |
+| Mediana até a coleta | mediana de horas entre publicação e coleta | a medida do **experimento da hipótese** (Objetivo 1) |
+
+| Critério | Dado / Quando / Então |
+|---|---|
+| CA6b.1 | **Dado** doações publicadas em semanas diferentes, **quando** Marta consulta o relatório, **então** há uma linha por semana, identificada pela segunda-feira, da mais recente para a mais antiga |
+| CA6b.2 | **Dado** doações em todas as situações numa mesma semana, **quando** Marta consulta, **então** cada doação aparece em exatamente uma situação, e as situações somam as publicadas |
+| CA6b.3 | **Dado** uma semana com doações retiradas, **quando** a taxa de coleta é calculada, **então** as retiradas ficam fora do denominador |
+| CA6b.4 | **Dado** uma semana em que todas as doações foram retiradas, **quando** Marta consulta, **então** a taxa aparece vazia, e não como erro nem como 0% |
+| CA6b.5 | **Dado** doações coletadas com tempos diferentes, **quando** Marta consulta, **então** vê a mediana de horas entre publicação e coleta |
+| CA6b.6 | **Dado** que não há doações, **quando** Marta consulta, **então** recebe um relatório vazio, e não um erro |
+
+Decisões de comportamento:
+- **As retiradas não entram na taxa.** Alimento impróprio não é comida boa desperdiçada, e
+  contá-lo puniria a taxa justamente quando o sistema agiu certo.
+- **Mediana, e não média.** Uma única coleta muito atrasada puxaria a média para cima sem
+  representar a semana: com coletas de 1 h, 3 h e 24 h, a média seria 9,3 h, e a mediana
+  é 3 h.
+- **A semana é a da hora gravada, em UTC.** Uma doação publicada num domingo depois das
+  21h, no horário de Brasília, entra na semana seguinte. Registrado no ADR 0006.
+
 ## Decisões de projeto
 
 Cada decisão abaixo responde a algo que a Unidade de Análise já havia levantado — uma
@@ -95,6 +135,7 @@ nenhuma regra de negócio conhece a origem do banco.
 | [0003](adr/0003-migrar-sqlite-para-postgresql.md) | Migrar o banco de SQLite para PostgreSQL | aceito; reavaliado pelo 0005, mantido |
 | [0004](adr/0004-reescrita-usar-postgresql.md) | Usar PostgreSQL — reescrita de um registro incompleto | aceito |
 | [0005](adr/0005-reavaliacao-postgresql-varias-cidades.md) | Reavaliação do 0003 para várias cidades | aceito |
+| [0006](adr/0006-relatorio-semanal-na-aplicacao.md) | Calcular o relatório semanal na aplicação, e não em SQL (H6b) | aceito |
 
 A decisão D3 não tem ADR próprio: ela foi tomada durante o walking skeleton da Unidade 1
 e está documentada aqui e no comentário de `aceitar()`, em `src/repositorio.js`.

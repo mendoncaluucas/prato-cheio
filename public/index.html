@@ -17,6 +17,12 @@
     .aviso[hidden] { display: none; }
     .aviso.erro { background: #fde8e8; border: 1px solid #f5b5b5; color: #8a1c1c; }
     .aviso.ok { background: #e6f4ea; border: 1px solid #b7dfc4; color: #1b5e2a; }
+    .nota { font-size: .85rem; color: #555; margin: -.4rem 0 .6rem; }
+    .tabela { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+    th, td { border: 1px solid #ddd; padding: .4rem .5rem; text-align: right; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { background: #f4f4f4; font-weight: 600; }
     button.secundario { margin-top: .4rem; background: none; border: 1px solid #c8a3a3; color: #8a1c1c; font-size: .85rem; padding: .4rem; }
   </style>
 </head>
@@ -41,11 +47,54 @@
   <h2>Aguardando coleta</h2>
   <ul id="aguardando"></ul>
 
+  <h2>Relatório semanal</h2>
+  <p class="nota">Semana de publicação, começando na segunda-feira. A taxa de coleta não conta as doações retiradas.</p>
+  <div class="tabela">
+    <table>
+      <thead>
+        <tr>
+          <th>Semana</th><th>Publicadas</th><th>Coletadas</th><th>Retiradas</th>
+          <th>Vencidas</th><th>Em aberto</th><th>Taxa de coleta</th><th>Mediana até a coleta</th>
+        </tr>
+      </thead>
+      <tbody id="relatorio"></tbody>
+    </table>
+  </div>
+
   <script>
-    // Recarrega as duas listas: aceitar tira a doação de uma e põe na outra.
+    // Recarrega as listas e o relatório: cada ação muda a situação de uma doação.
     function carregar() {
       carregarDisponiveis();
       carregarAguardando();
+      carregarRelatorio();
+    }
+
+    // H6b — uma linha por semana; "—" quando não há base para calcular.
+    async function carregarRelatorio() {
+      const res = await fetch('/api/relatorios/semanal');
+      const semanas = await res.json();
+      const corpo = document.getElementById('relatorio');
+      corpo.innerHTML = '';
+      if (!semanas.length) {
+        corpo.innerHTML = '<tr><td colspan="8">Nenhuma doação publicada ainda.</td></tr>';
+        return;
+      }
+      for (const s of semanas) {
+        const [ano, mes, dia] = s.semana.split('-');
+        const celulas = [
+          `${dia}/${mes}/${ano}`,
+          s.publicadas, s.coletadas, s.retiradas, s.vencidasSemColeta, s.emAberto,
+          s.taxaColeta === null ? '—' : `${s.taxaColeta}%`,
+          s.medianaHorasAteColeta === null ? '—' : `${s.medianaHorasAteColeta} h`
+        ];
+        const tr = document.createElement('tr');
+        for (const valor of celulas) {
+          const td = document.createElement('td');
+          td.textContent = valor;
+          tr.appendChild(td);
+        }
+        corpo.appendChild(tr);
+      }
     }
 
     async function carregarAguardando() {
