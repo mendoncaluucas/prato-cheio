@@ -76,6 +76,12 @@ export async function listarDisponiveis() {
   return repo.listarDisponiveis(hoje());
 }
 
+// H4a — o doador vê o que venceu sem ser aceito (CA4a.1 a CA4a.4).
+// A validade do próprio dia ainda vale, então só entra quem venceu antes de hoje.
+export async function listarVencidasSemAceite() {
+  return repo.listarVencidasSemAceite(hoje());
+}
+
 // Doações aceitas que ainda esperam a confirmação de coleta (ADR 0001).
 export async function listarAguardandoColeta() {
   return repo.listarAguardandoColeta();

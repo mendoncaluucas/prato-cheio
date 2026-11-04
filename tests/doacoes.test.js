@@ -199,6 +199,88 @@ describe('janela de retirada (RN2)', () => {
   });
 });
 
+describe('vencidas sem aceite (H4a)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  function vencidas() {
+    return request(app).get('/api/doacoes/vencidas');
+  }
+
+  // CA4a.1
+  // Dado uma doação que passou da validade sem nenhuma ONG aceitar
+  // Quando o doador consulta as vencidas sem aceite
+  // Então ela aparece, e não aparece na lista de disponíveis
+  it('mostra a doação que venceu sem ser aceita', async () => {
+    const doacao = await publicadaQueVenceu();
+
+    const res = await vencidas();
+    expect(res.status).toBe(200);
+    expect(res.body.map((d) => d.id)).toEqual([doacao.id]);
+
+    const disponiveis = await request(app).get('/api/doacoes');
+    expect(disponiveis.body).toEqual([]);
+  });
+
+  // CA4a.2
+  // Dado uma doação com validade de hoje e outra com validade futura
+  // Quando o doador consulta as vencidas sem aceite
+  // Então nenhuma das duas aparece: a validade do próprio dia ainda vale
+  it('não mostra doação dentro da validade, nem a que vence hoje', async () => {
+    await publicar({ ...doacaoValida, validade: emDias(0) });
+    await publicar();
+
+    const res = await vencidas();
+    expect(res.body).toEqual([]);
+  });
+
+  // CA4a.3
+  // Dado doações vencidas que foram aceitas, coletadas ou retiradas
+  // Quando o doador consulta as vencidas sem aceite
+  // Então nenhuma aparece: só conta a que continuou disponível
+  it('não mostra doação vencida que foi aceita, coletada ou retirada', async () => {
+    const aceita = await publicadaQueVenceu();
+    await repo.aceitar(aceita.id, 'ONG Aceita');
+
+    const coletada = await publicadaQueVenceu();
+    await repo.aceitar(coletada.id, 'ONG Coletou');
+    await repo.coletar(coletada.id);
+
+    const retirada = await publicadaQueVenceu();
+    await retirar(retirada.id, 'embalagem violada');
+
+    const res = await vencidas();
+    expect(res.body).toEqual([]);
+  });
+
+  // CA4a.4
+  // Dado doações que venceram em dias diferentes
+  // Quando o doador consulta as vencidas sem aceite
+  // Então a que venceu por último vem primeiro
+  it('ordena da que venceu por último para a mais antiga', async () => {
+    const antiga = await repo.inserir({ tipo: 'Leite', quantidade: '2', validade: emDias(-5) });
+    const recente = await repo.inserir({ tipo: 'Pão', quantidade: '5', validade: emDias(-1) });
+
+    const res = await vencidas();
+    expect(res.body.map((d) => d.id)).toEqual([recente.id, antiga.id]);
+  });
+
+  // CA4a.5
+  // Dado uma doação vencida sem aceite
+  // Quando uma ONG tenta aceitá-la
+  // Então a API recusa com 400 e ela continua entre as vencidas sem aceite
+  it('continua na lista depois de uma tentativa recusada de aceite', async () => {
+    const doacao = await publicadaQueVenceu();
+
+    const recusa = await aceitar(doacao.id, 'ONG Atrasada');
+    expect(recusa.status).toBe(400);
+    expect(recusa.body.erro).toMatch(/vencida/);
+
+    const res = await vencidas();
+    expect(res.body.map((d) => d.id)).toEqual([doacao.id]);
+  });
+});
+
 describe('confirmar a coleta (ADR 0001)', () => {
   beforeEach(async () => { await migrar(); await limparBanco(); });
   afterAll(async () => { await encerrar(); });

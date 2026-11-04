@@ -83,6 +83,32 @@ Decisões de comportamento:
 - **A semana é a da hora gravada, em UTC.** Uma doação publicada num domingo depois das
   21h, no horário de Brasília, entra na semana seguinte. Registrado no ADR 0006.
 
+## Histórias implementadas na Unidade 3
+
+### H4a — ver as doações que venceram sem aceite
+
+A H4 tinha dois comportamentos ("acompanhar" e "ser avisado") e dependia de saber quem é o
+doador, o que o sistema ainda não registra. Ela foi quebrada: a H4a entra agora, e a H4b
+(avisar o doador) fica para quando houver identificação de doador.
+
+> Como **doador**, quero ver as doações que passaram da validade sem nenhuma ONG aceitar,
+> para saber se vale a pena continuar publicando.
+
+Rota: `GET /api/doacoes/vencidas`. Na interface, a seção *Vencidas sem aceite*.
+
+| Critério | Dado / Quando / Então |
+|---|---|
+| CA4a.1 | **Dado** uma doação que passou da validade sem aceite, **quando** o doador consulta, **então** ela aparece, e não aparece entre as disponíveis |
+| CA4a.2 | **Dado** uma doação com validade de hoje ou futura, **quando** o doador consulta, **então** ela não aparece, porque a validade do próprio dia ainda vale |
+| CA4a.3 | **Dado** uma doação vencida que foi aceita, coletada ou retirada, **quando** o doador consulta, **então** ela não aparece |
+| CA4a.4 | **Dado** doações que venceram em dias diferentes, **quando** o doador consulta, **então** a que venceu por último vem primeiro |
+| CA4a.5 | **Dado** uma doação vencida sem aceite, **quando** uma ONG tenta aceitá-la, **então** a API recusa com 400 e ela continua na lista |
+
+Decisões de comportamento:
+- **"Vencida" continua sem ser um status.** A consulta usa a data, como a RN2 e o relatório
+  semanal, e nenhuma coluna nova foi criada.
+- **Limitação:** sem identificação de doador, a lista mostra as doações de todos.
+
 ## Decisões de projeto
 
 Cada decisão abaixo responde a algo que a Unidade de Análise já havia levantado — uma
