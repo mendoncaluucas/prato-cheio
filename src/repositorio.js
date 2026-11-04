@@ -36,6 +36,21 @@ export async function listarDisponiveis(hoje) {
   return rows;
 }
 
+// H4a — devolve as doações que ficaram disponíveis até a janela de retirada vencer,
+// da que venceu mais recentemente para a mais antiga. É o espelho de listarDisponiveis:
+// o mesmo status, o lado de fora do mesmo corte de validade. Doação aceita, coletada ou
+// retirada não entra — ela teve desfecho, e o que o doador precisa ver aqui é o que se
+// perdeu sem ninguém buscar.
+export async function listarExpiradas(hoje) {
+  const { rows } = await query(
+    `SELECT * FROM doacoes
+      WHERE status = 'disponivel' AND validade < ?
+      ORDER BY validade DESC, id DESC`,
+    [hoje]
+  );
+  return rows;
+}
+
 // Devolve as doações aceitas cuja coleta ainda não foi confirmada.
 export async function listarAguardandoColeta() {
   const { rows } = await query(

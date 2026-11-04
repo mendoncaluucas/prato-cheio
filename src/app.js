@@ -38,6 +38,7 @@ export function criarApp() {
   app.get('/api/doacoes', responder(() => doacoes.listarDisponiveis()));
   app.post('/api/doacoes', responder((req) => doacoes.criarDoacao(req.body ?? {}), 201));
   app.get('/api/doacoes/aceitas', responder(() => doacoes.listarAguardandoColeta()));
+  app.get('/api/doacoes/expiradas', responder(() => doacoes.listarExpiradas()));
   app.get('/api/relatorios/semanal', responder(() => doacoes.relatorioSemanal()));
   app.post('/api/doacoes/:id/aceitar', responder((req) => doacoes.aceitar(req.params.id, req.body?.ong)));
   app.post('/api/doacoes/:id/retirar', responder((req) => doacoes.retirar(req.params.id, req.body?.motivo)));

@@ -48,6 +48,10 @@
   <h2>Aguardando coleta</h2>
   <ul id="aguardando"></ul>
 
+  <h2>Expiraram sem ser aceitas</h2>
+  <p class="nota">O que você publicou e ninguém buscou até a validade passar (H4a).</p>
+  <ul id="expiradas"></ul>
+
   <h2>Relatório semanal</h2>
   <p class="nota">Semana de publicação, começando na segunda-feira. A taxa de coleta conta só as coletadas no prazo e não conta as doações retiradas.</p>
   <div class="tabela">
@@ -67,6 +71,7 @@
     function carregar() {
       carregarDisponiveis();
       carregarAguardando();
+      carregarExpiradas();
       carregarRelatorio();
     }
 
@@ -94,6 +99,26 @@
           tr.appendChild(td);
         }
         corpo.appendChild(tr);
+      }
+    }
+
+    // H4a — o que o doador publicou e expirou sem ninguém aceitar. Sem esta lista a
+    // doação vencida só desaparecia, pela RN2, e o doador não sabia que a comida se perdeu.
+    async function carregarExpiradas() {
+      const res = await fetch('/api/doacoes/expiradas');
+      const doacoes = await res.json();
+      const lista = document.getElementById('expiradas');
+      lista.innerHTML = doacoes.length
+        ? ''
+        : '<li>Nenhuma doação expirou sem ser aceita.</li>';
+      for (const d of doacoes) {
+        const li = document.createElement('li');
+        li.textContent = `${d.tipo} — ${d.quantidade} · `;
+        const alerta = document.createElement('span');
+        alerta.className = 'vencida';
+        alerta.textContent = `venceu em ${dataBR(d.validade)} sem ser aceita`;
+        li.appendChild(alerta);
+        lista.appendChild(li);
       }
     }
 

@@ -199,6 +199,63 @@ describe('janela de retirada (RN2)', () => {
   });
 });
 
+describe('doações expiradas sem aceite (H4a)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  // CA4a.1 — a doação que venceu disponível aparece para o doador, e só nessa lista.
+  it('lista a doação que venceu sem ser aceita', async () => {
+    const vencida = await publicadaQueVenceu();
+
+    const res = await request(app).get('/api/doacoes/expiradas');
+
+    expect(res.status).toBe(200);
+    expect(res.body.map((d) => d.id)).toEqual([vencida.id]);
+    expect(res.body[0].status).toBe('disponivel');
+
+    // O mesmo corte de validade das duas listas: nenhuma doação fica nas duas.
+    const disponiveis = await request(app).get('/api/doacoes');
+    expect(disponiveis.body.map((d) => d.id)).not.toContain(vencida.id);
+  });
+
+  // CA4a.2 — dentro da janela, a doação não expirou. A validade de hoje ainda vale,
+  // igual à publicação (CA1.3) e à listagem de disponíveis (RN2).
+  it('não lista doação dentro da janela de retirada, nem a que vence hoje', async () => {
+    await publicar();
+    await repo.inserir({ tipo: 'Arroz', quantidade: '2 kg', validade: emDias(0) });
+
+    const res = await request(app).get('/api/doacoes/expiradas');
+
+    expect(res.body).toEqual([]);
+  });
+
+  // CA4a.3 — doação com desfecho não entra: alguém assumiu a doação, ela não se perdeu.
+  it('não lista doação aceita, coletada ou retirada, mesmo depois de vencida', async () => {
+    const aceita = await publicadaQueVenceu();
+    await repo.aceitar(aceita.id, 'ONG Mesa Cheia');
+
+    const coletada = await publicadaQueVenceu();
+    await repo.aceitar(coletada.id, 'ONG Mesa Cheia');
+    await repo.coletar(coletada.id);
+
+    const retirada = await publicadaQueVenceu();
+    await repo.retirar(retirada.id, 'embalagem violada');
+
+    const res = await request(app).get('/api/doacoes/expiradas');
+
+    expect(res.body).toEqual([]);
+  });
+
+  it('ordena da que venceu mais recentemente para a mais antiga', async () => {
+    const antiga = await repo.inserir({ tipo: 'Pão', quantidade: '5', validade: emDias(-9) });
+    const recente = await repo.inserir({ tipo: 'Leite', quantidade: '3 L', validade: emDias(-2) });
+
+    const res = await request(app).get('/api/doacoes/expiradas');
+
+    expect(res.body.map((d) => d.id)).toEqual([recente.id, antiga.id]);
+  });
+});
+
 describe('confirmar a coleta (ADR 0001)', () => {
   beforeEach(async () => { await migrar(); await limparBanco(); });
   afterAll(async () => { await encerrar(); });

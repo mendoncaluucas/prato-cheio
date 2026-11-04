@@ -76,6 +76,17 @@ export async function listarDisponiveis() {
   return repo.listarDisponiveis(hoje());
 }
 
+// H4a — o doador vê as doações que publicou e expiraram sem ser aceitas (CA4a.1–CA4a.3).
+//
+// A RN2 tira a doação vencida da lista das ONGs, e até aqui ela simplesmente desaparecia:
+// ninguém ficava sabendo que a comida se perdeu. Esta é a informação que o doador precisa
+// para decidir se vale a pena continuar publicando — a incerteza registrada na análise.
+// O corte de validade é o mesmo de listarDisponiveis, para que nenhuma doação caia nas
+// duas listas nem fique fora das duas: a validade do próprio dia ainda vale.
+export async function listarExpiradas() {
+  return repo.listarExpiradas(hoje());
+}
+
 // Doações aceitas que ainda esperam a confirmação de coleta (ADR 0001).
 export async function listarAguardandoColeta() {
   return repo.listarAguardandoColeta();

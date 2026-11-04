@@ -103,6 +103,8 @@ história, indica onde ela vai doer e o que precisa ser decidido antes de constr
 | H2 | Como **ONG receptora**, quero ver as doações disponíveis agora, para decidir o que consigo buscar hoje. | passa nos seis, sem H1 a lista vem vazia, mas a história funciona e se testa sozinha |
 | H3 | Como **ONG receptora**, quero aceitar uma doação disponível, para garantir que ninguém mais vá buscá-la. | **Independente**, só faz sentido depois de H1 e H2. É o preço de uma fatia vertical, não um defeito: por isso as três entram na mesma iteração (RN3, RNI2) |
 | H4 | Como **doador**, quero acompanhar as doações que publiquei e ser avisado quando alguma expirar sem ser aceita, para saber se vale a pena continuar publicando. | **Pequena** (o "e" no meio denuncia dois comportamentos) e **Independente** (depende de H1 e H3). Precisa ser quebrada antes de entrar |
+| H4a | Como **doador**, quero ver as doações que publiquei e expiraram sem ser aceitas, para saber se vale a pena continuar publicando. | passa nos seis, é metade da H4 e a metade que responde a incerteza do piloto (RN2) |
+| H4b | Como **doador**, quero ser avisado quando uma doação minha expirar sem ser aceita, para reagir sem precisar abrir o sistema. | **Estimável**, depende de canal de aviso (e-mail, push) e de identidade do doador, que não existem no modelo atual. Fica para depois do piloto |
 | H5 | Como **voluntário entregador**, quero ver no celular as coletas atribuídas a mim, com endereço, para cumprir a rota do dia. | **Estimável** e **Pequena**, exige cadastro de voluntário, endereço e geolocalização, que não existem no modelo de dados atual (RN4) |
 | H6 | Como **Marta**, quero gerenciar toda a operação de doações do bairro, para escalar o programa. | **Pequena**, **Estimável** e **Testável**, é épico, não história: não cabe numa iteração, ninguém consegue estimar e não há como dizer quando está pronta. Quebrada em H6a–H6c |
 | H6a | Como **quem administra a plataforma**, quero aprovar o cadastro de uma ONG antes de ela poder aceitar doações, para que só organização verificada retire alimento. | passa nos seis, atende o critério mínimo de qualidade do conflito "crescer × qualidade" |
@@ -175,6 +177,36 @@ três horas do dia no horário de Brasília. Os testes também usam datas relati
 execução: uma validade fixa venceria com o tempo e passaria a esbarrar no CA1.3,
 quebrando testes que não têm relação com ele. Validade igual ao dia de hoje é aceita —
 só recusamos datas anteriores.
+
+### H4a — o doador vê o que expirou sem ser aceito (implementada na Unidade 3)
+
+A H4 estava marcada como não-**Pequena** desde a análise: o "e" no meio dela denunciava dois
+comportamentos — *acompanhar* o que expirou e *ser avisado* quando isso acontece. A quebra
+separa os dois. A H4a é a parte que cabe no modelo de dados atual e é a que responde à
+incerteza registrada no início ("não sabemos se os doadores vão cadastrar cada doação"): sem
+ver o que se perdeu, o doador não tem motivo para continuar publicando. A H4b, o aviso ativo,
+depende de canal de notificação e de identidade do doador, que o piloto não tem.
+
+- CA4a.1 — **Dado** uma doação que ficou disponível até a validade passar, **quando** o doador
+  consulta as doações expiradas, **então** o sistema a devolve, e ela não aparece na lista de
+  disponíveis das ONGs. *(RN2)*
+- CA4a.2 — **Dado** uma doação dentro da janela de retirada, inclusive a que vence hoje,
+  **quando** o doador consulta as expiradas, **então** ela não é devolvida. *(RN2)*
+- CA4a.3 — **Dado** uma doação que foi aceita, coletada ou retirada, **quando** o doador
+  consulta as expiradas depois da validade passar, **então** ela não é devolvida — a doação
+  teve desfecho e não se perdeu por falta de quem buscasse. *(RN3, H6c)*
+
+| Teste em `tests/doacoes.test.js` (bloco `doações expiradas sem aceite (H4a)`) | Critérios |
+|---|---|
+| `lista a doação que venceu sem ser aceita` | CA4a.1 |
+| `não lista doação dentro da janela de retirada, nem a que vence hoje` | CA4a.2 |
+| `não lista doação aceita, coletada ou retirada, mesmo depois de vencida` | CA4a.3 |
+| `ordena da que venceu mais recentemente para a mais antiga` | ordenação da lista |
+
+O corte de validade é o mesmo de `listarDisponiveis` — `validade < hoje` contra
+`validade >= hoje`, no fuso local. Isso é de propósito: as duas listas são complementares, e
+nenhuma doação disponível pode cair nas duas nem ficar fora das duas. O primeiro teste do
+bloco verifica justamente essa complementaridade.
 
 ## Riscos
 
