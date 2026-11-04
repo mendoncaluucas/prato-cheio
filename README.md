@@ -40,7 +40,12 @@ Os testes usam SQLite **em memória**, então não sujam o banco de desenvolvime
 
 > **Atenção:** não deixe o repositório dentro de uma pasta sincronizada (OneDrive, Google Drive, Dropbox) nem em disco de rede. O SQLite precisa de trava de arquivo e nesses lugares falha com `disk I/O error`. Clone em uma pasta local comum, por exemplo `~/dev/`.
 
-## O banco: SQLite agora, PostgreSQL depois
+## O banco: SQLite e PostgreSQL
+
+Com `DATABASE_URL` no `.env`, o sistema usa o PostgreSQL do grupo, no Neon ([ADR 0002](docs/adr/0002-subida-postgresql.md)). Sem ela, usa o SQLite local. Copie o `.env.example` para `.env` e peça a connection string a um integrante. **Nunca faça commit do `.env`.**
+
+`npm test` roda no SQLite em memória, e o CI roda a mesma suíte num PostgreSQL descartável.
+
 
 | Unidade | Banco | O que precisa instalar |
 |---|---|---|

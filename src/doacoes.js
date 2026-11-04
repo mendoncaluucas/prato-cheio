@@ -27,9 +27,11 @@ function hoje() {
 // o SQL — o node:sqlite trata um objeto como parâmetros nomeados, e os parâmetros
 // seguintes escorregam de posição.
 
-// Texto preenchido, sem espaços nas pontas; undefined se não for.
+// Texto preenchido, sem espaços nas pontas; undefined se não for. O PostgreSQL não guarda o
+// caractere nulo em texto: sem esta recusa, ele viraria erro 500 em vez de 400.
 function textoPreenchido(valor) {
-  return typeof valor === 'string' && valor.trim() !== '' ? valor.trim() : undefined;
+  if (typeof valor !== 'string' || valor.includes('\0')) return undefined;
+  return valor.trim() !== '' ? valor.trim() : undefined;
 }
 
 // Data real no formato AAAA-MM-DD. As comparações de validade são feitas como texto,
@@ -41,9 +43,12 @@ function dataValida(valor) {
   return d.getUTCFullYear() === ano && d.getUTCMonth() === mes - 1 && d.getUTCDate() === dia;
 }
 
+// Maior valor da coluna id no PostgreSQL (SERIAL). Acima disso o banco recusa a consulta.
+const ID_MAXIMO = 2147483647;
+
 // Identificador numérico positivo. Qualquer outra coisa não corresponde a uma doação.
 function idValido(id) {
-  if (!/^[1-9]\d*$/.test(String(id))) {
+  if (!/^[1-9]\d*$/.test(String(id)) || Number(id) > ID_MAXIMO) {
     throw new ErroDeNegocio('doação não encontrada');
   }
   return Number(id);
