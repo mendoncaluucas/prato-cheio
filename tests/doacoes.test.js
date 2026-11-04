@@ -651,7 +651,7 @@ describe('diferenças do PostgreSQL (ADR 0003)', () => {
   });
 
   it('recusa com 400 um texto com caractere nulo', async () => {
-    const res = await publicar({ ...doacaoValida, tipo: 'So pa' });
+    const res = await publicar({ ...doacaoValida, tipo: 'So\u0000pa' });
 
     expect(res.status).toBe(400);
     expect(res.body.erro).toMatch(/obrigatórios/);
