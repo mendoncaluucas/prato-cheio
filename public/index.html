@@ -48,6 +48,10 @@
   <h2>Aguardando coleta</h2>
   <ul id="aguardando"></ul>
 
+  <h2>Vencidas sem aceite</h2>
+  <p class="nota">Doações que passaram da validade sem nenhuma ONG aceitar.</p>
+  <ul id="vencidas"></ul>
+
   <h2>Relatório semanal</h2>
   <p class="nota">Semana de publicação, começando na segunda-feira. A taxa de coleta conta só as coletadas no prazo e não conta as doações retiradas.</p>
   <div class="tabela">
@@ -67,6 +71,7 @@
     function carregar() {
       carregarDisponiveis();
       carregarAguardando();
+      carregarVencidas();
       carregarRelatorio();
     }
 
@@ -94,6 +99,21 @@
           tr.appendChild(td);
         }
         corpo.appendChild(tr);
+      }
+    }
+
+    // H4a — só consulta: a doação vencida não pode mais ser aceita (RN2).
+    async function carregarVencidas() {
+      const res = await fetch('/api/doacoes/vencidas');
+      const doacoes = await res.json();
+      const lista = document.getElementById('vencidas');
+      lista.innerHTML = doacoes.length
+        ? ''
+        : '<li>Nenhuma doação venceu sem aceite.</li>';
+      for (const d of doacoes) {
+        const li = document.createElement('li');
+        li.textContent = `${d.tipo} — ${d.quantidade} · venceu em ${dataBR(d.validade)}`;
+        lista.appendChild(li);
       }
     }
 

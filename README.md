@@ -88,6 +88,17 @@ git push -u origin historia/ong-aceita-doacao
 Abra o Pull Request no GitHub, preencha o template, espere o **CI ficar verde** e
 peça a revisão de **outro integrante**. Só então faça o merge.
 
+## Definição de pronto
+
+Uma história só está pronta quando:
+
+- [ ] todos os critérios de aceite estão escritos e atendidos;
+- [ ] há teste para cada critério, incluindo as situações de erro, e a suíte passa;
+- [ ] funciona na interface, e não só na API;
+- [ ] entrou por Pull Request, revisado por outro integrante e com o CI verde;
+- [ ] a documentação foi atualizada (`docs/projeto.md` e, se houve decisão nova, um ADR);
+- [ ] se a IA gerou código, o PR registra o que foi mantido, o que mudou e por quê.
+
 ## O que já está pronto e o que falta
 
 **Pronto — Unidade 1 (Análise):** o documento de análise completo (`docs/analise.md`) e o
@@ -106,8 +117,11 @@ e cada doação guarda a hora em que foi publicada, aceita e coletada. Quem já 
 `dados.sqlite` da Unidade 1 não precisa apagá-lo: as colunas novas são acrescentadas ao
 subir o servidor.
 
-**Próximo:** completar o documento de projeto (diagramas, requisitos não-funcionais e
-critérios de validação).
+**Pronto — Unidade 2 (Projeto):** H6b e H6c, diagramas, requisitos não-funcionais e
+critérios de validação, no branch `entrega-2`.
+
+**Em andamento — Unidade 3 (Construção):** H4a (doações que venceram sem aceite) e a
+migração para PostgreSQL ([ADR 0003](docs/adr/0003-migrar-sqlite-para-postgresql.md)).
 
 ## Uso de IA
 

@@ -36,6 +36,19 @@ export async function listarDisponiveis(hoje) {
   return rows;
 }
 
+// H4a — doações que passaram da validade sem nenhuma ONG aceitar, da que venceu por último
+// para a mais antiga. "Vencida" não é um status: a doação continua 'disponivel' no banco, e
+// é a data que a separa da lista acima.
+export async function listarVencidasSemAceite(hoje) {
+  const { rows } = await query(
+    `SELECT * FROM doacoes
+      WHERE status = 'disponivel' AND validade < ?
+      ORDER BY validade DESC, id`,
+    [hoje]
+  );
+  return rows;
+}
+
 // Devolve as doações aceitas cuja coleta ainda não foi confirmada.
 export async function listarAguardandoColeta() {
   const { rows } = await query(
