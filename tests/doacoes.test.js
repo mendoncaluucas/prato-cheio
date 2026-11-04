@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import request from 'supertest';
 import { criarApp } from '../src/app.js';
-import { migrar, limparBanco, encerrar, conexao } from '../src/db.js';
+import { migrar, limparBanco, encerrar, query, colunas } from '../src/db.js';
 import * as repo from '../src/repositorio.js';
 import { montarRelatorioSemanal } from '../src/doacoes.js';
 
@@ -382,10 +382,11 @@ describe('retirar doação denunciada (H6c)', () => {
 // Grava uma doação com as marcas de hora escolhidas pelo teste, no formato UTC que o
 // banco usa ('AAAA-MM-DD HH:MM:SS'). Pela API as horas seriam sempre "agora".
 function doacaoEm(criadaEm, { status = 'disponivel', coletadaEm = null, validade = VALIDADE_FUTURA } = {}) {
-  conexao().prepare(
+  return query(
     `INSERT INTO doacoes (tipo, quantidade, validade, status, criada_em, coletada_em)
-     VALUES ('Sopa', '10', ?, ?, ?, ?)`
-  ).run(validade, status, criadaEm, coletadaEm);
+     VALUES ('Sopa', '10', ?, ?, ?, ?)`,
+    [validade, status, criadaEm, coletadaEm]
+  );
 }
 
 function relatorio() {
@@ -401,9 +402,9 @@ describe('relatório semanal (H6b)', () => {
   // Quando Marta consulta o relatório
   // Então há uma linha por semana, identificada pela segunda-feira, da mais recente para a mais antiga
   it('agrupa por semana, da mais recente para a mais antiga', async () => {
-    doacaoEm('2026-10-05 10:00:00'); // segunda
-    doacaoEm('2026-10-11 20:00:00'); // domingo da mesma semana
-    doacaoEm('2026-10-12 09:00:00'); // segunda seguinte
+    await doacaoEm('2026-10-05 10:00:00'); // segunda
+    await doacaoEm('2026-10-11 20:00:00'); // domingo da mesma semana
+    await doacaoEm('2026-10-12 09:00:00'); // segunda seguinte
 
     const res = await relatorio();
 
@@ -417,11 +418,11 @@ describe('relatório semanal (H6b)', () => {
   // Quando Marta consulta o relatório
   // Então cada doação aparece em exatamente uma situação, e as situações somam as publicadas
   it('conta cada doação em uma única situação', async () => {
-    doacaoEm('2026-10-05 10:00:00', { status: 'coletada', coletadaEm: '2026-10-05 12:00:00' });
-    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
-    doacaoEm('2026-10-05 10:00:00', { status: 'disponivel', validade: VALIDADE_VENCIDA });
-    doacaoEm('2026-10-05 10:00:00', { status: 'aceita', validade: VALIDADE_VENCIDA });
-    doacaoEm('2026-10-05 10:00:00', { status: 'disponivel' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'coletada', coletadaEm: '2026-10-05 12:00:00' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'disponivel', validade: VALIDADE_VENCIDA });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'aceita', validade: VALIDADE_VENCIDA });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'disponivel' });
 
     const [s] = (await relatorio()).body;
 
@@ -438,10 +439,10 @@ describe('relatório semanal (H6b)', () => {
   // Quando a taxa de coleta é calculada
   // Então as retiradas ficam fora do denominador
   it('calcula a taxa de coleta sem contar as retiradas', async () => {
-    doacaoEm('2026-10-05 10:00:00', { status: 'coletada', coletadaEm: '2026-10-05 11:00:00' });
-    doacaoEm('2026-10-05 10:00:00', { status: 'disponivel', validade: VALIDADE_VENCIDA });
-    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
-    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'coletada', coletadaEm: '2026-10-05 11:00:00' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'disponivel', validade: VALIDADE_VENCIDA });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
 
     const [s] = (await relatorio()).body;
 
@@ -450,7 +451,7 @@ describe('relatório semanal (H6b)', () => {
 
   // CA6b.4 — situação de erro: sem denominador, não há taxa
   it('não calcula taxa quando todas as doações da semana foram retiradas', async () => {
-    doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
+    await doacaoEm('2026-10-05 10:00:00', { status: 'retirada' });
 
     const [s] = (await relatorio()).body;
 
@@ -473,10 +474,10 @@ describe('relatório semanal (H6b)', () => {
   // Quando Marta consulta o relatório
   // Então ela vê a mediana de horas entre publicação e coleta, a medida do experimento da hipótese
   it('mostra a mediana de horas entre publicação e coleta', async () => {
-    doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-05 09:00:00' }); // 1 h
-    doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-05 11:00:00' }); // 3 h
-    doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-06 08:00:00' }); // 24 h
-    doacaoEm('2026-10-05 08:00:00', { status: 'disponivel' }); // sem coleta: fora da mediana
+    await doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-05 09:00:00' }); // 1 h
+    await doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-05 11:00:00' }); // 3 h
+    await doacaoEm('2026-10-05 08:00:00', { status: 'coletada', coletadaEm: '2026-10-06 08:00:00' }); // 24 h
+    await doacaoEm('2026-10-05 08:00:00', { status: 'disponivel' }); // sem coleta: fora da mediana
 
     const [s] = (await relatorio()).body;
 
@@ -484,7 +485,7 @@ describe('relatório semanal (H6b)', () => {
   });
 
   it('não mostra mediana numa semana sem coletas', async () => {
-    doacaoEm('2026-10-05 08:00:00');
+    await doacaoEm('2026-10-05 08:00:00');
 
     const [s] = (await relatorio()).body;
 
@@ -502,8 +503,8 @@ describe('relatório semanal (H6b)', () => {
 
   // A semana é a da hora gravada, em UTC (limitação registrada no ADR 0006)
   it('separa domingo 23h59 e segunda 00h00 em semanas diferentes', async () => {
-    doacaoEm('2026-10-11 23:59:59');
-    doacaoEm('2026-10-12 00:00:00');
+    await doacaoEm('2026-10-11 23:59:59');
+    await doacaoEm('2026-10-12 00:00:00');
 
     const res = await relatorio();
 
@@ -523,8 +524,8 @@ describe('coleta após o vencimento (H6b, opção registrada no projeto)', () =>
   // teste dá o mesmo resultado aqui e no CI, que roda em UTC.
   // CA6b.7
   it('conta à parte a coleta confirmada depois da validade, fora da taxa', async () => {
-    doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-07', coletadaEm: '2026-10-06 12:00:00' });
-    doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-06', coletadaEm: '2026-10-09 12:00:00' });
+    await doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-07', coletadaEm: '2026-10-06 12:00:00' });
+    await doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-06', coletadaEm: '2026-10-09 12:00:00' });
 
     const [s] = (await relatorio()).body;
 
@@ -534,7 +535,7 @@ describe('coleta após o vencimento (H6b, opção registrada no projeto)', () =>
   });
 
   it('considera no prazo a coleta feita no próprio dia da validade', async () => {
-    doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-06', coletadaEm: '2026-10-06 15:00:00' });
+    await doacaoEm('2026-10-05 12:00:00', { status: 'coletada', validade: '2026-10-06', coletadaEm: '2026-10-06 15:00:00' });
 
     const [s] = (await relatorio()).body;
 
@@ -545,7 +546,7 @@ describe('coleta após o vencimento (H6b, opção registrada no projeto)', () =>
   it('continua permitindo confirmar a coleta de uma doação aceita que já venceu', async () => {
     const { id } = await repo.inserir({ tipo: 'Pão', quantidade: '5', validade: VALIDADE_FUTURA });
     await repo.aceitar(id, 'Amigos do Bem');
-    conexao().prepare('UPDATE doacoes SET validade = ? WHERE id = ?').run(VALIDADE_VENCIDA, id);
+    await query('UPDATE doacoes SET validade = ? WHERE id = ?', [VALIDADE_VENCIDA, id]);
 
     const res = await coletar(id);
 
@@ -559,8 +560,8 @@ describe('validação de entrada', () => {
   afterAll(async () => { await encerrar(); });
 
   async function nadaFoiCriado() {
-    const { rows } = { rows: conexao().prepare('SELECT COUNT(*) AS n FROM doacoes').all() };
-    expect(rows[0].n).toBe(0);
+    const { rows } = await query('SELECT COUNT(*) AS n FROM doacoes');
+    expect(Number(rows[0].n)).toBe(0);
   }
 
   // Com a validade comparada como texto, estes formatos escapavam da RN2 e da RNI1:
@@ -634,6 +635,38 @@ describe('validação de entrada', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.erro).toMatch(/não encontrada/);
+  });
+});
+
+describe('diferenças do PostgreSQL (ADR 0003)', () => {
+  beforeEach(async () => { await migrar(); await limparBanco(); });
+  afterAll(async () => { await encerrar(); });
+
+  // O SQLite aceitava estes valores. No PostgreSQL eles estouram na consulta e virariam 500.
+  it('recusa com 400 um id acima do limite da coluna', async () => {
+    const res = await aceitar('99999999999', 'Amigos do Bem');
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/não encontrada/);
+  });
+
+  it('recusa com 400 um texto com caractere nulo', async () => {
+    const res = await publicar({ ...doacaoValida, tipo: 'So pa' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/obrigatórios/);
+  });
+
+  // RNI2 com requisições simultâneas de verdade: no SQLite elas nunca se sobrepõem.
+  it('deixa só uma ONG aceitar quando várias tentam ao mesmo tempo', async () => {
+    const { body: doacao } = await publicar();
+
+    const respostas = await Promise.all(
+      ['ONG A', 'ONG B', 'ONG C', 'ONG D'].map((ong) => aceitar(doacao.id, ong))
+    );
+
+    expect(respostas.filter((r) => r.status === 200)).toHaveLength(1);
+    expect(respostas.filter((r) => r.status === 400)).toHaveLength(3);
   });
 });
 
@@ -739,22 +772,16 @@ describe('migração do banco (ADR 0001)', () => {
   // migrar() acrescenta as colunas novas a uma tabela que existia sem elas.
   it('acrescenta aceita_em e coletada_em a uma tabela criada na Unidade 1', async () => {
     await migrar();
-    conexao().exec(`
-      DROP TABLE doacoes;
-      CREATE TABLE doacoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT NOT NULL,
-        quantidade TEXT NOT NULL, validade TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'disponivel', ong TEXT,
-        criada_em TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
+    for (const coluna of ['aceita_em', 'coletada_em', 'retirada_em', 'motivo_retirada']) {
+      await query(`ALTER TABLE doacoes DROP COLUMN ${coluna}`);
+    }
 
     await migrar();
 
-    const colunas = conexao().prepare('PRAGMA table_info(doacoes)').all().map((c) => c.name);
-    expect(colunas).toContain('aceita_em');
-    expect(colunas).toContain('coletada_em');
-    expect(colunas).toContain('retirada_em');
-    expect(colunas).toContain('motivo_retirada');
+    const existentes = await colunas();
+    expect(existentes).toContain('aceita_em');
+    expect(existentes).toContain('coletada_em');
+    expect(existentes).toContain('retirada_em');
+    expect(existentes).toContain('motivo_retirada');
   });
 });

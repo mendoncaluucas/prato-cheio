@@ -5,6 +5,7 @@
 - **Revisto em:** 08/10/2026 ([ADR 0005](0005-reavaliacao-postgresql-varias-cidades.md)) —
   mantido para o piloto acadêmico. Deve ser substituído se o sistema passar a ser usado
   de verdade por mais de uma cidade.
+- **Revisto em:** 04/11/2026 — versão alterada de 16 para 18, a do projeto criado no Neon. A decisão de usar o Neon não mudou.
 
 ## Contexto
 O `src/db.js` já foi desenhado para isolar a troca de banco (SQLite → PostgreSQL) atrás
@@ -26,7 +27,7 @@ da refatoração da Unidade 3 para não travar o trabalho por falta de banco ace
    Risco: depende de internet e de limites do plano gratuito.
 
 ## Decisão
-Alternativa 3: **serviço gerenciado gratuito**, usando o **Neon** com **PostgreSQL 16**,
+Alternativa 3: **serviço gerenciado gratuito**, usando o **Neon** com **PostgreSQL 18**,
 alcançável por `DATABASE_URL`.
 
 O que pesou foi a uniformidade. As alternativas 1 e 2 exigem que cada integrante monte o
