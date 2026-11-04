@@ -88,6 +88,22 @@ git push -u origin historia/ong-aceita-doacao
 Abra o Pull Request no GitHub, preencha o template, espere o **CI ficar verde** e
 peça a revisão de **outro integrante**. Só então faça o merge.
 
+## Definição de pronto
+
+Acordo do grupo, escrito antes de começar a história e igual para todas elas. Uma história só é "pronta" quando os sete itens estão cumpridos, não vale deixar item para depois porque o prazo apertou:  
+
+1. **Cada critério de aceite da história tem teste automatizado** em `tests/`, incluindo ao menos um caso de erro ou de limite. Teste que passaria mesmo com a regra apagada não conta.  
+2. **A suíte inteira passa** (`npm test`), não só os testes novos.  
+3. **O CI está verde** no Pull Request.  
+4. **Outro integrante revisou o PR** e aprovou. Quem escreveu não faz o merge do próprio código sem revisão.  
+5. **A história é usável pela interface** em `public/index.html`, que precisa funcionar na tela do celular — é onde o doador, a ONG e o voluntário vão usar o sistema (RNF de acesso pelo navegador do celular).  
+6. **A história está rastreável:** a mensagem de commit e o PR citam a história (H1, H6b…) ou o ADR que a originou, e o código cita o critério de aceite que ele atende.  
+7. **A documentação afetada foi atualizada** no mesmo PR — critérios de aceite em `docs/analise.md`, decisão nova em `docs/adr/`, e este README quando muda a forma de rodar o projeto.  
+
+**Se a história foi escrita com ajuda de IA**, o PR registra o que foi mantido, o que foi alterado e por quê — e quem abriu o PR sabe explicar cada linha que ficou.  
+
+> O que **não** entra na definição: "funciona na minha máquina", "depois a gente testa" e teste escrito só para o número subir. Os itens acima são verificáveis um por um por qualquer integrante, sem precisar perguntar a quem escreveu.  
+
 ## O que já está pronto e o que falta
 
 **Pronto — Unidade 1 (Análise):** o documento de análise completo (`docs/analise.md`) e o
