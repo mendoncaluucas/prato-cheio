@@ -279,6 +279,30 @@ describe('vencidas sem aceite (H4a)', () => {
     const res = await vencidas();
     expect(res.body.map((d) => d.id)).toEqual([doacao.id]);
   });
+
+  // Casos que os critérios da H4a não previam.
+
+  // Dado duas doações que venceram no mesmo dia
+  // Quando o doador consulta as vencidas sem aceite
+  // Então a publicada primeiro vem antes, e a ordem não muda entre uma consulta e outra
+  it('desempata pela ordem de publicação quando vencem no mesmo dia', async () => {
+    const primeira = await publicadaQueVenceu();
+    const segunda = await publicadaQueVenceu();
+
+    const res = await vencidas();
+    expect(res.body.map((d) => d.id)).toEqual([primeira.id, segunda.id]);
+  });
+
+  // Dado que nenhuma doação venceu sem aceite
+  // Quando o doador consulta
+  // Então a API responde 200 com lista vazia, e não erro: é disso que a interface
+  // depende para mostrar a mensagem de lista vazia
+  it('responde 200 com lista vazia quando nada venceu', async () => {
+    const res = await vencidas();
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
 });
 
 describe('confirmar a coleta (ADR 0001)', () => {
