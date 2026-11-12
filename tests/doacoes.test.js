@@ -149,6 +149,13 @@ describe('aceitar uma doação', () => {
     expect(res.body.erro).toBeTruthy();
   });
 
+  it('recusa aceitar uma doação que não existe', async () => {
+    const res = await aceitar(999999, 'Amigos do Bem');
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/não encontrada/);
+  });
+
   // ADR 0001 — a hora do aceite passa a ser registrada
   it('registra a hora do aceite', async () => {
     const criada = await publicar();

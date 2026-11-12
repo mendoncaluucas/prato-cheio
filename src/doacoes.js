@@ -55,6 +55,24 @@ function idValido(id) {
   return Number(id);
 }
 
+// Busca a doação pelo id já validado; sem ela, não há o que aceitar, retirar ou coletar.
+async function buscarOuRecusar(numero) {
+  const doacao = await repo.buscarPorId(numero);
+  if (!doacao) {
+    throw new ErroDeNegocio('doação não encontrada');
+  }
+  return doacao;
+}
+
+// O UPDATE do repositório já filtra pelo status esperado. Se não devolveu linha, outra
+// requisição mudou a doação entre a busca e a escrita: vira a mensagem de recusa.
+function exigirAtualizada(linha, mensagem) {
+  if (!linha) {
+    throw new ErroDeNegocio(mensagem);
+  }
+  return linha;
+}
+
 // H1 — o doador publica uma doação.
 // CA1.1: tipo, quantidade e validade preenchidos criam a doação (RN1).
 // CA1.2: faltando qualquer um dos três, recusa (RN1).
@@ -101,10 +119,7 @@ export async function aceitar(id, ong) {
   if (!nome) {
     throw new ErroDeNegocio('informe o nome da ONG que está aceitando a doação');
   }
-  const doacao = await repo.buscarPorId(numero);
-  if (!doacao) {
-    throw new ErroDeNegocio('doação não encontrada');
-  }
+  const doacao = await buscarOuRecusar(numero);
   if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação foi retirada da lista por ser imprópria');
   }
@@ -117,13 +132,8 @@ export async function aceitar(id, ong) {
     throw new ErroDeNegocio('doação vencida: a janela de retirada já passou');
   }
 
-  const atualizada = await repo.aceitar(numero, nome);
-  // O UPDATE já filtra por status disponível. Se não devolveu linha, outra ONG
-  // aceitou entre a busca acima e a escrita — aqui isso vira mensagem de erro.
-  if (!atualizada) {
-    throw new ErroDeNegocio('doação já foi aceita por outra ONG');
-  }
-  return atualizada;
+  // Se não voltou linha, outra ONG aceitou entre a busca acima e a escrita.
+  return exigirAtualizada(await repo.aceitar(numero, nome), 'doação já foi aceita por outra ONG');
 }
 
 // As marcas de hora são gravadas como 'AAAA-MM-DD HH:MM:SS', em UTC.
@@ -214,10 +224,7 @@ export async function retirar(id, motivo) {
   if (!texto) {
     throw new ErroDeNegocio('informe o motivo da retirada');
   }
-  const doacao = await repo.buscarPorId(numero);
-  if (!doacao) {
-    throw new ErroDeNegocio('doação não encontrada');
-  }
+  const doacao = await buscarOuRecusar(numero);
   if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação já foi retirada');
   }
@@ -225,13 +232,11 @@ export async function retirar(id, motivo) {
     throw new ErroDeNegocio('não é possível retirar uma doação que já foi coletada');
   }
 
-  const atualizada = await repo.retirar(numero, texto);
-  // Se não voltou linha, a doação mudou de estado entre a busca e a escrita —
-  // foi coletada ou retirada por outra pessoa no meio do caminho.
-  if (!atualizada) {
-    throw new ErroDeNegocio('a doação mudou de estado e não pôde ser retirada; atualize a lista');
-  }
-  return atualizada;
+  // Se não voltou linha, foi coletada ou retirada por outra pessoa no meio do caminho.
+  return exigirAtualizada(
+    await repo.retirar(numero, texto),
+    'a doação mudou de estado e não pôde ser retirada; atualize a lista'
+  );
 }
 
 // ADR 0001 — a ONG confirma que buscou a doação. Fecha o ciclo de vida
@@ -241,10 +246,7 @@ export async function retirar(id, motivo) {
 // confirmado depois —, mas o relatório conta essa coleta à parte.
 export async function coletar(id) {
   const numero = idValido(id);
-  const doacao = await repo.buscarPorId(numero);
-  if (!doacao) {
-    throw new ErroDeNegocio('doação não encontrada');
-  }
+  const doacao = await buscarOuRecusar(numero);
   if (doacao.status === STATUS.COLETADA) {
     throw new ErroDeNegocio('a coleta desta doação já foi confirmada');
   }
@@ -255,10 +257,6 @@ export async function coletar(id) {
     throw new ErroDeNegocio('só é possível confirmar a coleta de uma doação aceita');
   }
 
-  const atualizada = await repo.coletar(numero);
   // Mesmo raciocínio do aceite: se não voltou linha, outra confirmação chegou antes.
-  if (!atualizada) {
-    throw new ErroDeNegocio('a coleta desta doação já foi confirmada');
-  }
-  return atualizada;
+  return exigirAtualizada(await repo.coletar(numero), 'a coleta desta doação já foi confirmada');
 }
