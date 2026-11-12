@@ -12,13 +12,58 @@
   - testes depois da mudança: ___ passando
   - link da execução do CI verde:
 
-## Refatoração 2 — (nome)
+## Refatoração 2 — Status escritos à mão viram uma constante
 
-- **Cheiro de código atacado:** (duplicação, função longa, nome que engana, regra na rota…)
-- **Qual dor concreta isso resolvia:**
-- **O que mudou:**
-- **Evidência (testes verdes antes e depois):**
+- **Cheiro de código atacado:** strings mágicas. `'disponivel'`, `'aceita'`, `'coletada'` e
+  `'retirada'` apareciam soltas em `doacoes.js` e `repositorio.js`.
+- **Qual dor concreta isso resolvia:** um erro de digitação (`'coletado'`) não quebra nada, só
+  deixa a regra de pé torta. E para saber os status possíveis era preciso ler o arquivo todo.
+- **O que mudou:** novo `src/status.js` com `STATUS`. `doacoes.js` usa a constante, e no
+  `repositorio.js` os status passaram a ir como parâmetro `?` no SQL. O `DEFAULT 'disponivel'`
+  do schema em `db.js` ficou como está.
+- **Evidência:** 71 testes passando antes, 71 depois.
+
+## Refatoração 3 — Busca por id e "perdeu a corrida" repetidos
+
+- **Cheiro de código atacado:** duplicação. `aceitar`, `retirar` e `coletar` tinham o mesmo
+  bloco de buscar a doação e recusar se não existe, e o mesmo bloco de recusar quando o UPDATE
+  não devolve linha.
+- **Qual dor concreta isso resolvia:** três cópias para manter iguais. Quem mexesse na
+  mensagem de uma esquecia as outras.
+- **O que mudou:** duas funções em `doacoes.js`, `buscarOuRecusar` e `exigirAtualizada`. As
+  mensagens de erro são as mesmas de antes. Antes de mexer escrevi o teste que faltava
+  (aceitar uma doação que não existe).
+- **Evidência:** 71 testes antes. Com o teste novo, 72 antes e depois da extração.
+
+## Refatoração 4 — `doacoes.js` fazia regra de negócio e cálculo de relatório
+
+- **Cheiro de código atacado:** módulo com duas responsabilidades. As contas do relatório
+  semanal (semana, mediana, taxa) moravam junto das regras de aceitar, retirar e coletar.
+- **Qual dor concreta isso resolvia:** arquivo longo, e o relatório só precisa de datas e
+  números, não do banco nem das regras.
+- **O que mudou:** `src/relatorio.js` ficou com `montarRelatorioSemanal` e seus auxiliares,
+  `src/datas.js` com `diaLocal`, `hoje` e `instanteUTC`. `doacoes.js` só busca os dados e chama
+  o cálculo, e continua exportando `montarRelatorioSemanal`, então os testes não mudaram.
+- **Evidência:** 72 testes antes e depois (os blocos do relatório semanal e da coleta
+  após o vencimento cobrem esse código).
+
+## Refatoração 5 — Front-end: o mesmo POST escrito quatro vezes
+
+- **Cheiro de código atacado:** duplicação em `public/index.html`. Publicar, aceitar, coletar
+  e retirar repetiam o fetch, a leitura da resposta, o aviso de sucesso ou erro e o recarregar.
+- **Qual dor concreta isso resolvia:** cada ação nova copiava o bloco de novo.
+- **O que mudou:** função `enviar(url, dados, mensagemOk)` no script da página.
+- **Evidência:** a interface não tinha teste nenhum. Criei `tests/interface.test.js` (jsdom,
+  `devDependency` nova) com 7 casos que abrem a página e clicam nos botões, e rodei contra o
+  código antigo antes de refatorar. 72 testes passando antes (mais os 7 do teste novo, 79 no
+  total), 79 depois.
 
 ---
 
-**Limitações e o que ficou de fora:** (o que vocês viram e decidiram não refatorar, e por quê)
+**Limitações e o que ficou de fora:**
+- O `if (URL_BANCO)` espalhado em `db.js` só some quando o SQLite for removido (migração, parte
+  da Refatoração 1), por isso não mexi lá.
+- O `index.html` continua com tudo num arquivo só (CSS, HTML e script).
+- `criarDoacao` tem uma validação longa que poderia ir para um módulo próprio.
+- Uso de IA: a IA apontou os cheiros e propôs as extrações. O grupo revisou o diff e rodou os
+  testes. (ajustar com o que o grupo de fato fez)
