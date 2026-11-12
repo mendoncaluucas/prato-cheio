@@ -4,6 +4,7 @@
 // repositório só fala SQL. Erro de regra (ErroDeNegocio) vira resposta 400; qualquer
 // outro erro é falha do servidor e vira 500.
 import * as repo from './repositorio.js';
+import { STATUS } from './status.js';
 
 // Recusa por regra de negócio: a mensagem é feita para quem usa o sistema ler.
 export class ErroDeNegocio extends Error {}
@@ -104,10 +105,10 @@ export async function aceitar(id, ong) {
   if (!doacao) {
     throw new ErroDeNegocio('doação não encontrada');
   }
-  if (doacao.status === 'retirada') {
+  if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação foi retirada da lista por ser imprópria');
   }
-  if (doacao.status !== 'disponivel') {
+  if (doacao.status !== STATUS.DISPONIVEL) {
     throw new ErroDeNegocio('doação já foi aceita por outra ONG');
   }
   // RN2: fora da janela, a doação já não está disponível — mesmo que ainda tenha
@@ -174,7 +175,7 @@ export function montarRelatorioSemanal(linhas, diaDeHoje) {
     }
     const s = semanas.get(chave);
     s.publicadas++;
-    if (d.status === 'coletada') {
+    if (d.status === STATUS.COLETADA) {
       s.horasAteColeta.push((instanteUTC(d.coletada_em) - instanteUTC(d.criada_em)) / 3_600_000);
       // O dia da coleta é comparado no fuso local, o mesmo da validade.
       if (diaLocal(new Date(instanteUTC(d.coletada_em))) > d.validade) {
@@ -182,7 +183,7 @@ export function montarRelatorioSemanal(linhas, diaDeHoje) {
       } else {
         s.coletadas++;
       }
-    } else if (d.status === 'retirada') {
+    } else if (d.status === STATUS.RETIRADA) {
       s.retiradas++;
     } else if (d.validade < diaDeHoje) {
       s.vencidasSemColeta++; // disponível ou aceita, mas a janela já passou
@@ -217,10 +218,10 @@ export async function retirar(id, motivo) {
   if (!doacao) {
     throw new ErroDeNegocio('doação não encontrada');
   }
-  if (doacao.status === 'retirada') {
+  if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação já foi retirada');
   }
-  if (doacao.status === 'coletada') {
+  if (doacao.status === STATUS.COLETADA) {
     throw new ErroDeNegocio('não é possível retirar uma doação que já foi coletada');
   }
 
@@ -244,13 +245,13 @@ export async function coletar(id) {
   if (!doacao) {
     throw new ErroDeNegocio('doação não encontrada');
   }
-  if (doacao.status === 'coletada') {
+  if (doacao.status === STATUS.COLETADA) {
     throw new ErroDeNegocio('a coleta desta doação já foi confirmada');
   }
-  if (doacao.status === 'retirada') {
+  if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação foi retirada da lista por ser imprópria e não deve ser buscada');
   }
-  if (doacao.status !== 'aceita') {
+  if (doacao.status !== STATUS.ACEITA) {
     throw new ErroDeNegocio('só é possível confirmar a coleta de uma doação aceita');
   }
 
