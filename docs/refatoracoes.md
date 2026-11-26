@@ -4,13 +4,32 @@
 
 ## Refatoração 1 — Migração de SQLite para PostgreSQL
 
-- **Motivo:** (o que a decidiu — ver o ADR da Unidade 2)
-- **O que mudou:** (arquivos e o que neles)
-- **O que NÃO mudou:** (as regras de negócio? as rotas? os testes?)
+- **Motivo:** a disciplina exige banco relacional em PostgreSQL na Unidade 3, e o SQLite
+  era um arquivo local, com um escritor por vez e um módulo ainda experimental
+  ([ADR 0003](adr/0003-migrar-sqlite-para-postgresql.md); o Neon vem do
+  [ADR 0002](adr/0002-subida-postgresql.md)).
+- **O que mudou:**
+  - `src/db.js` deixou de falar com o `node:sqlite`. Ficou só o `pg`, e sem `DATABASE_URL` o
+    módulo falha com uma mensagem em português. `query`, `colunas`, `migrar`, `limparBanco` e
+    `encerrar` continuam com a mesma interface.
+  - A coluna `validade` passou de `TEXT` para `DATE`. O `pg` devolve `DATE` como objeto com
+    fuso, então um parser do tipo 1082 devolve o texto `AAAA-MM-DD` e a API não mudou. `migrar()`
+    converte uma tabela antiga e continua idempotente.
+  - `vitest.config.js` só aceita `DATABASE_URL_TESTE` e ignora a `DATABASE_URL` do ambiente.
+    Antes, um `npm test` com a URL do Neon no terminal apagaria as doações do grupo. O CI ganhou
+    a variável no passo dos testes.
+  - `README.md` e `.env.example` descrevem o PostgreSQL local com Docker.
+  - Na primeira parte da migração (PR #24), `src/doacoes.js` passou a recusar o caractere nulo
+    em texto e a limitar o id a 2147483647. No PostgreSQL esses dois casos viravam erro 500.
+- **O que NÃO mudou:** as regras de negócio, as rotas, o contrato da API (`validade` segue
+  como `AAAA-MM-DD`) e os testes de comportamento. O ADR dizia que a troca ficaria só no
+  `db.js`, e isso valeu só em parte, por causa das duas recusas acima (nota no ADR 0003).
 - **Evidência de que o comportamento se manteve:**
-  - testes antes da mudança: ___ passando
-  - testes depois da mudança: ___ passando
-  - link da execução do CI verde:
+  - testes antes da mudança: 79 passando (SQLite em memória)
+  - testes depois da mudança: 79 passando contra o PostgreSQL 18, mais 6 novos em
+    `tests/banco.test.js` (guarda do `DATABASE_URL_TESTE`, `DATABASE_URL` obrigatória, coluna
+    `DATE`, validade como texto, conversão da coluna antiga), 85 no total
+  - link da execução do CI verde: (colar o link do PR depois do push)
 
 ## Refatoração 2 — Status escritos à mão viram uma constante
 
@@ -62,8 +81,7 @@
 ---
 
 **Limitações e o que ficou de fora:**
-- O `if (URL_BANCO)` espalhado em `db.js` só some quando o SQLite for removido (migração, parte
-  da Refatoração 1), por isso não mexemos lá.
+- O `if (URL_BANCO)` de `db.js` saiu junto com o SQLite, na Refatoração 1.
 - O `index.html` continua com tudo num arquivo só (CSS, HTML e script).
 - `criarDoacao` tem uma validação longa que poderia ir para um módulo próprio.
 - Uso de IA: a IA apontou os trechos do código que valia melhorar (valores escritos à mão,
