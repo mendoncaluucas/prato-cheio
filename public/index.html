@@ -135,16 +135,9 @@
         }
         const botao = document.createElement('button');
         botao.textContent = 'Confirmar coleta';
-        botao.onclick = async () => {
+        botao.onclick = () => {
           botao.disabled = true;
-          const res = await fetch(`/api/doacoes/${d.id}/coletar`, { method: 'POST' });
-          const corpo = await res.json();
-          if (res.ok) {
-            avisar(`Coleta confirmada: ${corpo.tipo}.`, 'ok');
-          } else {
-            avisar(corpo.erro, 'erro');
-          }
-          carregar();
+          enviar(`/api/doacoes/${d.id}/coletar`, undefined, (corpo) => `Coleta confirmada: ${corpo.tipo}.`);
         };
         li.appendChild(botao);
         li.appendChild(botaoRetirar(d));
@@ -164,21 +157,10 @@
         li.textContent = `${d.tipo} — ${d.quantidade} (até ${d.validade}) `;
         const botao = document.createElement('button');
         botao.textContent = 'Aceitar';
-        botao.onclick = async () => {
+        botao.onclick = () => {
           botao.disabled = true;
-          const res = await fetch(`/api/doacoes/${d.id}/aceitar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ong: 'Minha ONG' })
-          });
-          const corpo = await res.json();
-          if (res.ok) {
-            avisar(`Doação aceita: ${corpo.tipo}.`, 'ok');
-          } else {
-            // Recusa esperada quando outra ONG aceitou antes (CA3.2).
-            avisar(corpo.erro, 'erro');
-          }
-          carregar();
+          // Recusa esperada quando outra ONG aceitou antes (CA3.2): o erro da API vai para o aviso.
+          enviar(`/api/doacoes/${d.id}/aceitar`, { ong: 'Minha ONG' }, (corpo) => `Doação aceita: ${corpo.tipo}.`);
         };
         li.appendChild(botao);
         li.appendChild(botaoRetirar(d));
@@ -186,30 +168,17 @@
       }
     }
 
-    // A API recusa publicação e aceite com 400 e { erro }. Sem exibir essa
-    // resposta, a tela fica muda e o doador não sabe por que nada aconteceu.
     // H6c — retirar uma doação denunciada como imprópria. Vale para disponíveis e para
     // aceitas ainda não coletadas; o motivo é obrigatório e a API recusa sem ele.
     function botaoRetirar(d) {
       const botao = document.createElement('button');
       botao.textContent = 'Retirar (imprópria)';
       botao.className = 'secundario';
-      botao.onclick = async () => {
+      botao.onclick = () => {
         const motivo = prompt(`Motivo da retirada de "${d.tipo}":`);
         if (motivo === null) return; // cancelou
         botao.disabled = true;
-        const res = await fetch(`/api/doacoes/${d.id}/retirar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ motivo })
-        });
-        const corpo = await res.json();
-        if (res.ok) {
-          avisar(`Doação retirada: ${corpo.tipo}.`, 'ok');
-        } else {
-          avisar(corpo.erro, 'erro');
-        }
-        carregar();
+        enviar(`/api/doacoes/${d.id}/retirar`, { motivo }, (corpo) => `Doação retirada: ${corpo.tipo}.`);
       };
       return botao;
     }
@@ -225,6 +194,21 @@
       return `${dia}/${mes}/${ano}`;
     }
 
+    // Envia um POST, mostra no aviso o sucesso (texto de `mensagemOk`) ou o erro da API e
+    // recarrega as listas. Devolve true se o servidor aceitou.
+    async function enviar(url, dados, mensagemOk) {
+      const opcoes = { method: 'POST' };
+      if (dados !== undefined) {
+        opcoes.headers = { 'Content-Type': 'application/json' };
+        opcoes.body = JSON.stringify(dados);
+      }
+      const res = await fetch(url, opcoes);
+      const corpo = await res.json();
+      avisar(res.ok ? mensagemOk(corpo) : corpo.erro, res.ok ? 'ok' : 'erro');
+      carregar();
+      return res.ok;
+    }
+
     function avisar(mensagem, tipo) {
       const aviso = document.getElementById('aviso');
       aviso.textContent = mensagem;
@@ -238,25 +222,15 @@
       );
       const [tipo, quantidade, validade] = campos;
 
-      const res = await fetch('/api/doacoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo: tipo.value,
-          quantidade: quantidade.value,
-          validade: validade.value
-        })
-      });
-      const corpo = await res.json();
-
-      if (res.ok) {
-        avisar('Doação publicada.', 'ok');
+      // Campos obrigatórios (CA1.2) ou validade vencida (CA1.3) voltam como erro no aviso.
+      const publicada = await enviar(
+        '/api/doacoes',
+        { tipo: tipo.value, quantidade: quantidade.value, validade: validade.value },
+        () => 'Doação publicada.'
+      );
+      if (publicada) {
         for (const campo of campos) campo.value = '';
-      } else {
-        // Campos obrigatórios (CA1.2) ou validade vencida (CA1.3).
-        avisar(corpo.erro, 'erro');
       }
-      carregar();
     };
 
     carregar();

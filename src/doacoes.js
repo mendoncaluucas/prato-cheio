@@ -4,22 +4,15 @@
 // repositório só fala SQL. Erro de regra (ErroDeNegocio) vira resposta 400; qualquer
 // outro erro é falha do servidor e vira 500.
 import * as repo from './repositorio.js';
+import { STATUS } from './status.js';
+import { hoje } from './datas.js';
+import { montarRelatorioSemanal } from './relatorio.js';
+
+// Os testes e outros módulos importam daqui; o cálculo mudou de arquivo, o contrato não.
+export { montarRelatorioSemanal };
 
 // Recusa por regra de negócio: a mensagem é feita para quem usa o sistema ler.
 export class ErroDeNegocio extends Error {}
-
-// Dia em AAAA-MM-DD, no fuso local.
-// Não usamos toISOString() porque ele converte para UTC e, no fuso do Brasil,
-// devolveria o dia seguinte durante as últimas três horas do dia.
-function diaLocal(data) {
-  const mes = String(data.getMonth() + 1).padStart(2, '0');
-  const dia = String(data.getDate()).padStart(2, '0');
-  return `${data.getFullYear()}-${mes}-${dia}`;
-}
-
-function hoje() {
-  return diaLocal(new Date());
-}
 
 // --- validação de entrada --------------------------------------------------------
 // O corpo da requisição chega como o cliente quiser. Nada segue para o banco sem passar
@@ -52,6 +45,24 @@ function idValido(id) {
     throw new ErroDeNegocio('doação não encontrada');
   }
   return Number(id);
+}
+
+// Busca a doação pelo id já validado; sem ela, não há o que aceitar, retirar ou coletar.
+async function buscarOuRecusar(numero) {
+  const doacao = await repo.buscarPorId(numero);
+  if (!doacao) {
+    throw new ErroDeNegocio('doação não encontrada');
+  }
+  return doacao;
+}
+
+// O UPDATE do repositório já filtra pelo status esperado. Se não devolveu linha, outra
+// requisição mudou a doação entre a busca e a escrita: vira a mensagem de recusa.
+function exigirAtualizada(linha, mensagem) {
+  if (!linha) {
+    throw new ErroDeNegocio(mensagem);
+  }
+  return linha;
 }
 
 // H1 — o doador publica uma doação.
@@ -100,14 +111,11 @@ export async function aceitar(id, ong) {
   if (!nome) {
     throw new ErroDeNegocio('informe o nome da ONG que está aceitando a doação');
   }
-  const doacao = await repo.buscarPorId(numero);
-  if (!doacao) {
-    throw new ErroDeNegocio('doação não encontrada');
-  }
-  if (doacao.status === 'retirada') {
+  const doacao = await buscarOuRecusar(numero);
+  if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação foi retirada da lista por ser imprópria');
   }
-  if (doacao.status !== 'disponivel') {
+  if (doacao.status !== STATUS.DISPONIVEL) {
     throw new ErroDeNegocio('doação já foi aceita por outra ONG');
   }
   // RN2: fora da janela, a doação já não está disponível — mesmo que ainda tenha
@@ -116,92 +124,13 @@ export async function aceitar(id, ong) {
     throw new ErroDeNegocio('doação vencida: a janela de retirada já passou');
   }
 
-  const atualizada = await repo.aceitar(numero, nome);
-  // O UPDATE já filtra por status disponível. Se não devolveu linha, outra ONG
-  // aceitou entre a busca acima e a escrita — aqui isso vira mensagem de erro.
-  if (!atualizada) {
-    throw new ErroDeNegocio('doação já foi aceita por outra ONG');
-  }
-  return atualizada;
+  // Se não voltou linha, outra ONG aceitou entre a busca acima e a escrita.
+  return exigirAtualizada(await repo.aceitar(numero, nome), 'doação já foi aceita por outra ONG');
 }
 
-// As marcas de hora são gravadas como 'AAAA-MM-DD HH:MM:SS', em UTC.
-function instanteUTC(marca) {
-  return Date.parse(marca.replace(' ', 'T') + 'Z');
-}
-
-// Segunda-feira (em UTC) da semana de uma marca de hora, como 'AAAA-MM-DD'.
-function segundaDaSemana(marca) {
-  const d = new Date(instanteUTC(marca));
-  const desdeSegunda = (d.getUTCDay() + 6) % 7; // domingo = 6, segunda = 0
-  const segunda = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - desdeSegunda));
-  return segunda.toISOString().slice(0, 10);
-}
-
-function mediana(valores) {
-  if (valores.length === 0) return null;
-  const ordenados = [...valores].sort((a, b) => a - b);
-  const meio = Math.floor(ordenados.length / 2);
-  return ordenados.length % 2
-    ? ordenados[meio]
-    : (ordenados[meio - 1] + ordenados[meio]) / 2;
-}
-
-const umaCasa = (n) => Math.round(n * 10) / 10;
-
-// H6b — Marta vê, a cada semana, quantas das doações publicadas terminaram coletadas.
-//
-// Cada doação entra na semana em que foi publicada e cai em exatamente uma situação:
-// coletada no prazo, coletada após o vencimento, retirada, vencida sem coleta ou ainda
-// em aberto. A taxa de coleta conta só as coletadas no prazo — alimento buscado depois
-// de vencer não é comida boa salva — e não conta as retiradas: alimento impróprio não é
-// comida boa desperdiçada, e contá-lo puniria a taxa justamente quando o sistema agiu
-// certo. A mediana de horas até a coleta é a medida do experimento da hipótese
-// (Objetivo de Impacto 1) e considera todas as coletas, no prazo ou não.
+// H6b — o relatório semanal de coletas; o cálculo está em src/relatorio.js.
 export async function relatorioSemanal() {
   return montarRelatorioSemanal(await repo.listarParaRelatorio(), hoje());
-}
-
-export function montarRelatorioSemanal(linhas, diaDeHoje) {
-  const semanas = new Map();
-  for (const d of linhas) {
-    const chave = segundaDaSemana(d.criada_em);
-    if (!semanas.has(chave)) {
-      semanas.set(chave, {
-        semana: chave, publicadas: 0, coletadas: 0, coletadasAposVencimento: 0,
-        retiradas: 0, vencidasSemColeta: 0, emAberto: 0, horasAteColeta: []
-      });
-    }
-    const s = semanas.get(chave);
-    s.publicadas++;
-    if (d.status === 'coletada') {
-      s.horasAteColeta.push((instanteUTC(d.coletada_em) - instanteUTC(d.criada_em)) / 3_600_000);
-      // O dia da coleta é comparado no fuso local, o mesmo da validade.
-      if (diaLocal(new Date(instanteUTC(d.coletada_em))) > d.validade) {
-        s.coletadasAposVencimento++;
-      } else {
-        s.coletadas++;
-      }
-    } else if (d.status === 'retirada') {
-      s.retiradas++;
-    } else if (d.validade < diaDeHoje) {
-      s.vencidasSemColeta++; // disponível ou aceita, mas a janela já passou
-    } else {
-      s.emAberto++;
-    }
-  }
-
-  return [...semanas.values()]
-    .sort((a, b) => b.semana.localeCompare(a.semana))
-    .map(({ horasAteColeta, ...s }) => {
-      const consideradas = s.publicadas - s.retiradas;
-      const med = mediana(horasAteColeta);
-      return {
-        ...s,
-        taxaColeta: consideradas > 0 ? umaCasa((s.coletadas / consideradas) * 100) : null,
-        medianaHorasAteColeta: med === null ? null : umaCasa(med)
-      };
-    });
 }
 
 // H6c — quem administra a plataforma retira da lista uma doação denunciada como
@@ -213,24 +142,19 @@ export async function retirar(id, motivo) {
   if (!texto) {
     throw new ErroDeNegocio('informe o motivo da retirada');
   }
-  const doacao = await repo.buscarPorId(numero);
-  if (!doacao) {
-    throw new ErroDeNegocio('doação não encontrada');
-  }
-  if (doacao.status === 'retirada') {
+  const doacao = await buscarOuRecusar(numero);
+  if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação já foi retirada');
   }
-  if (doacao.status === 'coletada') {
+  if (doacao.status === STATUS.COLETADA) {
     throw new ErroDeNegocio('não é possível retirar uma doação que já foi coletada');
   }
 
-  const atualizada = await repo.retirar(numero, texto);
-  // Se não voltou linha, a doação mudou de estado entre a busca e a escrita —
-  // foi coletada ou retirada por outra pessoa no meio do caminho.
-  if (!atualizada) {
-    throw new ErroDeNegocio('a doação mudou de estado e não pôde ser retirada; atualize a lista');
-  }
-  return atualizada;
+  // Se não voltou linha, foi coletada ou retirada por outra pessoa no meio do caminho.
+  return exigirAtualizada(
+    await repo.retirar(numero, texto),
+    'a doação mudou de estado e não pôde ser retirada; atualize a lista'
+  );
 }
 
 // ADR 0001 — a ONG confirma que buscou a doação. Fecha o ciclo de vida
@@ -240,24 +164,17 @@ export async function retirar(id, motivo) {
 // confirmado depois —, mas o relatório conta essa coleta à parte.
 export async function coletar(id) {
   const numero = idValido(id);
-  const doacao = await repo.buscarPorId(numero);
-  if (!doacao) {
-    throw new ErroDeNegocio('doação não encontrada');
-  }
-  if (doacao.status === 'coletada') {
+  const doacao = await buscarOuRecusar(numero);
+  if (doacao.status === STATUS.COLETADA) {
     throw new ErroDeNegocio('a coleta desta doação já foi confirmada');
   }
-  if (doacao.status === 'retirada') {
+  if (doacao.status === STATUS.RETIRADA) {
     throw new ErroDeNegocio('esta doação foi retirada da lista por ser imprópria e não deve ser buscada');
   }
-  if (doacao.status !== 'aceita') {
+  if (doacao.status !== STATUS.ACEITA) {
     throw new ErroDeNegocio('só é possível confirmar a coleta de uma doação aceita');
   }
 
-  const atualizada = await repo.coletar(numero);
   // Mesmo raciocínio do aceite: se não voltou linha, outra confirmação chegou antes.
-  if (!atualizada) {
-    throw new ErroDeNegocio('a coleta desta doação já foi confirmada');
-  }
-  return atualizada;
+  return exigirAtualizada(await repo.coletar(numero), 'a coleta desta doação já foi confirmada');
 }

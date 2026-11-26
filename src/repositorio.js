@@ -4,6 +4,7 @@
 // Marcador de parâmetro é `?` (SQL parametrizado evita injeção):
 //   const { rows } = await query('SELECT * FROM doacoes WHERE id = ?', [id]);
 import { query } from './db.js';
+import { STATUS } from './status.js';
 
 // Hora atual em UTC, no formato 'AAAA-MM-DD HH:MM:SS' usado em todas as marcas de hora.
 // Gerada aqui, e não com datetime('now'), para o SQL deste arquivo valer igual no
@@ -29,9 +30,9 @@ export async function inserir({ tipo, quantidade, validade }) {
 export async function listarDisponiveis(hoje) {
   const { rows } = await query(
     `SELECT * FROM doacoes
-      WHERE status = 'disponivel' AND validade >= ?
+      WHERE status = ? AND validade >= ?
       ORDER BY id`,
-    [hoje]
+    [STATUS.DISPONIVEL, hoje]
   );
   return rows;
 }
@@ -42,9 +43,9 @@ export async function listarDisponiveis(hoje) {
 export async function listarVencidasSemAceite(hoje) {
   const { rows } = await query(
     `SELECT * FROM doacoes
-      WHERE status = 'disponivel' AND validade < ?
+      WHERE status = ? AND validade < ?
       ORDER BY validade DESC, id`,
-    [hoje]
+    [STATUS.DISPONIVEL, hoje]
   );
   return rows;
 }
@@ -52,7 +53,8 @@ export async function listarVencidasSemAceite(hoje) {
 // Devolve as doações aceitas cuja coleta ainda não foi confirmada.
 export async function listarAguardandoColeta() {
   const { rows } = await query(
-    `SELECT * FROM doacoes WHERE status = 'aceita' ORDER BY aceita_em, id`
+    `SELECT * FROM doacoes WHERE status = ? ORDER BY aceita_em, id`,
+    [STATUS.ACEITA]
   );
   return rows;
 }
@@ -72,10 +74,10 @@ export async function buscarPorId(id) {
 export async function aceitar(id, ong) {
   const { rows } = await query(
     `UPDATE doacoes
-        SET status = 'aceita', ong = ?, aceita_em = ?
-      WHERE id = ? AND status = 'disponivel'
+        SET status = ?, ong = ?, aceita_em = ?
+      WHERE id = ? AND status = ?
      RETURNING *`,
-    [ong, agora(), id]
+    [STATUS.ACEITA, ong, agora(), id, STATUS.DISPONIVEL]
   );
   return rows[0];
 }
@@ -97,10 +99,10 @@ export async function listarParaRelatorio() {
 export async function retirar(id, motivo) {
   const { rows } = await query(
     `UPDATE doacoes
-        SET status = 'retirada', motivo_retirada = ?, retirada_em = ?
-      WHERE id = ? AND status IN ('disponivel', 'aceita')
+        SET status = ?, motivo_retirada = ?, retirada_em = ?
+      WHERE id = ? AND status IN (?, ?)
      RETURNING *`,
-    [motivo, agora(), id]
+    [STATUS.RETIRADA, motivo, agora(), id, STATUS.DISPONIVEL, STATUS.ACEITA]
   );
   return rows[0];
 }
@@ -111,10 +113,10 @@ export async function retirar(id, motivo) {
 export async function coletar(id) {
   const { rows } = await query(
     `UPDATE doacoes
-        SET status = 'coletada', coletada_em = ?
-      WHERE id = ? AND status = 'aceita'
+        SET status = ?, coletada_em = ?
+      WHERE id = ? AND status = ?
      RETURNING *`,
-    [agora(), id]
+    [STATUS.COLETADA, agora(), id, STATUS.ACEITA]
   );
   return rows[0];
 }
