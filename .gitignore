@@ -10,5 +10,8 @@ dados.sqlite-journal
 # artefatos temporários do vitest
 *.timestamp-*
 
+# relatório de cobertura (npm run test:cobertura)
+coverage/
+
 # configuração local de ferramentas de IA (não faz parte do projeto)
 .claude/
