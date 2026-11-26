@@ -21,49 +21,51 @@ Conecta doadores de alimentos excedentes a ONGs, antes que a comida se perca.
 
 ## Como rodar
 
-Requisito: **Node.js 22.13 ou superior**. Mais nada — o banco da Unidade 1 é SQLite, embutido no próprio Node.
+Requisitos: **Node.js 22.13 ou superior** e um **PostgreSQL** acessível por `DATABASE_URL`. O banco do grupo é o do Neon ([ADR 0002](docs/adr/0002-subida-postgresql.md)), mas para desenvolver dá para usar um PostgreSQL local descartável.
 
 > Esta é a **stack preferencial** da disciplina. Se o seu grupo optar por outra, registre o ADR de justificativa e garanta os mesmos compromissos: repositório público com CI verde, rota de saúde, testes por um comando, os três comandos documentados aqui no README e banco relacional migrado para PostgreSQL na Unidade 3.
 
+### Banco local com Docker
+
+```bash
+docker run -d --name pc-pg -e POSTGRES_USER=pratocheio -e POSTGRES_PASSWORD=pratocheio   -e POSTGRES_DB=pratocheio -p 5432:5432 postgres:18-alpine
+```
+
+Copie o `.env.example` para `.env`. Ele já traz a `DATABASE_URL` desse contêiner. Para usar o banco do grupo no Neon, peça a connection string a um integrante e troque a linha. **Nunca faça commit do `.env`.**
+
 ```bash
 npm install       # só na primeira vez
-npm run db:migrar # cria o schema (arquivo dados.sqlite)
+npm run db:migrar # cria o schema
 npm start         # sobe em http://localhost:3000
-npm test          # roda os testes
 npm run dev       # sobe recarregando a cada alteração
 ```
 
-Os testes usam SQLite **em memória**, então não sujam o banco de desenvolvimento.
+Sem `DATABASE_URL` a aplicação não sobe e avisa o que falta.
 
-> Ao rodar `npm test` o Node imprime `ExperimentalWarning: SQLite is an experimental feature`.
-> É esperado — o módulo embutido `node:sqlite` ainda é marcado como experimental. Não é erro e não reprova o CI.
+### Testes
 
-> **Atenção:** não deixe o repositório dentro de uma pasta sincronizada (OneDrive, Google Drive, Dropbox) nem em disco de rede. O SQLite precisa de trava de arquivo e nesses lugares falha com `disk I/O error`. Clone em uma pasta local comum, por exemplo `~/dev/`.
+```bash
+docker run -d --name pc-pg-teste -e POSTGRES_USER=pratocheio -e POSTGRES_PASSWORD=pratocheio   -e POSTGRES_DB=pratocheio -p 5433:5432 postgres:18-alpine
+DATABASE_URL_TESTE=postgres://pratocheio:pratocheio@localhost:5433/pratocheio npm test
+```
 
-## O banco: SQLite e PostgreSQL
+Os testes **apagam todas as doações** do banco a cada execução. Por isso o `npm test` só aceita a variável `DATABASE_URL_TESTE` e ignora a `DATABASE_URL`, mesmo que ela esteja definida no terminal. Sem `DATABASE_URL_TESTE` ele para e explica como subir um banco descartável. **Nunca aponte `DATABASE_URL_TESTE` para o Neon.**
 
-Com `DATABASE_URL` no `.env`, o sistema usa o PostgreSQL do grupo, no Neon ([ADR 0002](docs/adr/0002-subida-postgresql.md)). Sem ela, usa o SQLite local. Copie o `.env.example` para `.env` e peça a connection string a um integrante. **Nunca faça commit do `.env`.**
+No Windows (PowerShell), defina a variável antes: `$env:DATABASE_URL_TESTE = "postgres://pratocheio:pratocheio@localhost:5433/pratocheio"`.
 
-`npm test` roda no SQLite em memória, e o CI roda a mesma suíte num PostgreSQL descartável.
+## O banco: PostgreSQL
 
+A aplicação usa só PostgreSQL ([ADR 0003](docs/adr/0003-migrar-sqlite-para-postgresql.md)). Nas Unidades 1 e 2 o banco era o SQLite embutido no Node, e a migração está registrada na Refatoração 1 de [`docs/refatoracoes.md`](docs/refatoracoes.md).
 
-| Unidade | Banco | O que precisa instalar |
-|---|---|---|
-| 1 — Análise | **SQLite** (`node:sqlite`, embutido) | nada além do Node |
-| 2 — Projeto | SQLite | nada |
-| 3 — Construção | **PostgreSQL** (após refatorar) | um PostgreSQL acessível — o caminho é escolha do grupo |
+O `src/db.js` expõe `query()` devolvendo `{ rows }` e cuida do schema. A `validade` é uma coluna `DATE`, e a API continua recebendo e devolvendo texto `AAAA-MM-DD`. Quem já tinha a tabela com `validade` como texto não precisa fazer nada: `migrar()` converte a coluna ao subir o servidor, e rodar de novo não muda nada.
 
-A troca não é acidente de percurso: na Unidade 2 vocês registram a decisão em um **ADR** (alternativas, consequências, riscos) e na Unidade 3 executam a **refatoração** — com os testes existentes provando que o comportamento se manteve.
-
-O `src/db.js` foi desenhado para isso: ele expõe `query()` devolvendo `{ rows }`, então a troca do banco fica contida nele e não vaza para as regras de negócio.
-
-**Como o PostgreSQL vai subir é decisão do grupo**, comparada no mesmo ADR: instalar o PostgreSQL na máquina, subir um contêiner, ou usar um serviço gerenciado gratuito (Neon, Supabase, Render). A disciplina não impõe o caminho — exige o banco alcançável por `DATABASE_URL`, o schema migrado e o CI verde. Cada opção tem custo e risco diferentes, e reconhecê-los é parte da decisão.
+O CI sobe o seu próprio PostgreSQL descartável a cada execução e roda a mesma suíte nele.
 
 ## Estrutura
 
 ```
 src/server.js        entrypoint (npm start)
-src/db.js            conexão e schema do banco (pronto)
+src/db.js            conexão e schema do PostgreSQL
 src/app.js           rotas da API
 src/doacoes.js       regras de negócio      <- implementar (U1)
 src/repositorio.js   acesso ao banco (SQL)  <- implementar (U1)
@@ -118,15 +120,14 @@ incremento e o 0002, como o PostgreSQL sobe na Unidade 3.
 
 O incremento do ADR 0001 está implementado: doação com a janela vencida some da lista e
 não pode mais ser aceita (RN2), a ONG confirma a coleta em `POST /api/doacoes/:id/coletar`,
-e cada doação guarda a hora em que foi publicada, aceita e coletada. Quem já tinha um
-`dados.sqlite` da Unidade 1 não precisa apagá-lo: as colunas novas são acrescentadas ao
-subir o servidor.
+e cada doação guarda a hora em que foi publicada, aceita e coletada. As colunas novas são acrescentadas ao subir o servidor.
 
 **Pronto — Unidade 2 (Projeto):** H6b e H6c, diagramas, requisitos não-funcionais e
 critérios de validação, no branch `entrega-2`.
 
 **Em andamento — Unidade 3 (Construção):** H4a (doações que venceram sem aceite) e a
-migração para PostgreSQL ([ADR 0003](docs/adr/0003-migrar-sqlite-para-postgresql.md)).
+migração para PostgreSQL ([ADR 0003](docs/adr/0003-migrar-sqlite-para-postgresql.md)),
+que o código já completa: o SQLite saiu do `src/db.js`.
 
 ## Uso de IA
 
