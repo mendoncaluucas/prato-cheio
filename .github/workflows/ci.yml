@@ -42,8 +42,12 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # O vitest só aceita DATABASE_URL_TESTE (vitest.config.js): é o que impede os testes
+      # de apagarem os dados de um banco que não seja descartável.
       - name: Rodar os testes
         run: npm test
+        env:
+          DATABASE_URL_TESTE: postgres://pratocheio:pratocheio@localhost:5432/pratocheio
 
       - name: Verificar se a aplicação sobe
         run: |
