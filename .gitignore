@@ -3,7 +3,7 @@ node_modules/
 .DS_Store
 .env
 
-# banco local de desenvolvimento (SQLite)
+# arquivos do SQLite, que o projeto usava antes da migração para o PostgreSQL
 dados.sqlite
 dados.sqlite-journal
 
