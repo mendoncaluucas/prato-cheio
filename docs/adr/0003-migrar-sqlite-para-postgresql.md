@@ -4,6 +4,12 @@
 - **Status:** aceito
 - **Reavaliado em:** 08/10/2026, para o cenário de várias cidades — decisão **mantida**
   (ver [ADR 0005](0005-reavaliacao-postgresql-varias-cidades.md))
+- **Revisto em:** 26/11/2026 — a troca não ficou contida em `src/db.js`, como a Decisão e a
+  Consequência prometiam. O `src/doacoes.js` também mudou, no PR #24: passou a recusar o
+  caractere nulo em texto e a limitar o id a `ID_MAXIMO = 2147483647`, o maior valor do
+  `SERIAL`. No SQLite os dois casos passavam, e no PostgreSQL viravam erro 500 em vez de 400.
+  A decisão de migrar não mudou. O que mudou é o aviso: a camada de regras também precisa
+  conhecer os limites do banco novo.
 
 > Atividade "ADR", item 1. A decisão de **onde** o PostgreSQL roda é outra, registrada no
 > [ADR 0002](0002-subida-postgresql.md); este registro trata de **se** e **para qual banco**
