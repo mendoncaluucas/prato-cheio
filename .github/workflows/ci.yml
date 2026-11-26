@@ -45,6 +45,9 @@ jobs:
       - name: Rodar os testes
         run: npm test
 
+      - name: Medir a cobertura dos testes
+        run: npm run test:cobertura
+
       - name: Verificar se a aplicação sobe
         run: |
           npm start &
