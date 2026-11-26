@@ -1,32 +1,22 @@
-// Conexão com o banco. A interface (`query` devolvendo `{ rows }`) é a mesma nos dois bancos,
-// então a troca fica contida neste arquivo e não vaza para as regras de negócio (ADR 0003).
-//
-// Com DATABASE_URL, o banco é o PostgreSQL (ADR 0002). Sem ela, é o SQLite do `node:sqlite`,
-// que continua servindo para rodar sem internet enquanto a migração não termina.
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+// Conexão com o banco: PostgreSQL, pela DATABASE_URL (ADR 0002 e ADR 0003).
+// A interface (`query` devolvendo `{ rows }`) fica aqui, longe das regras de negócio.
 import pg from 'pg';
 
 const URL_BANCO = process.env.DATABASE_URL;
 
-// Sem DATABASE_FILE, o banco fica na raiz do projeto, resolvida a partir deste arquivo.
-// Um caminho relativo dependeria da pasta de onde o servidor foi iniciado e, rodando de
-// outro lugar, criaria um banco novo e vazio, como se os dados tivessem sumido.
-const ARQUIVO = process.env.DATABASE_FILE || fileURLToPath(new URL('../dados.sqlite', import.meta.url));
-
-let db;
-let pool;
-
-// `node:sqlite` é módulo embutido do Node 22+. Carregado via createRequire porque
-// algumas ferramentas (como o Vite/Vitest) ainda não o reconhecem como embutido, e só
-// quando for usado, para o aviso de módulo experimental não aparecer com o PostgreSQL.
-function sqlite() {
-  if (!db) {
-    const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
-    db = new DatabaseSync(ARQUIVO);
-  }
-  return db;
+if (!URL_BANCO) {
+  throw new Error(
+    'DATABASE_URL não está definida. Copie o .env.example para .env e preencha a connection ' +
+    'string do PostgreSQL (o README explica como subir um com Docker).'
+  );
 }
+
+// O pg devolve DATE (tipo 1082) como objeto Date no fuso da máquina, e a API trabalha com
+// texto AAAA-MM-DD. Devolver o valor cru do banco mantém o formato e evita o deslocamento
+// de um dia que o fuso causaria.
+pg.types.setTypeParser(1082, (valor) => valor);
+
+let pool;
 
 function postgres() {
   if (!pool) {
@@ -38,7 +28,7 @@ function postgres() {
   return pool;
 }
 
-// O código usa `?` como marcador nos dois bancos. O PostgreSQL espera $1, $2...
+// O código usa `?` como marcador nas consultas. O PostgreSQL espera $1, $2...
 function marcadoresPostgres(sql) {
   let n = 0;
   return sql.replace(/\?/g, () => `$${++n}`);
@@ -50,35 +40,27 @@ function marcadoresPostgres(sql) {
  *   query('SELECT * FROM doacoes WHERE id = ?', [id])
  */
 export async function query(sql, valores = []) {
-  if (URL_BANCO) {
-    const resultado = await postgres().query(marcadoresPostgres(sql), valores);
-    return { rows: resultado.rows, alteradas: resultado.rowCount };
-  }
-  const stmt = sqlite().prepare(sql);
-  const ehLeitura = /^\s*(select|with|pragma)/i.test(sql) || /returning/i.test(sql);
-  if (ehLeitura) return { rows: stmt.all(...valores) };
-  const info = stmt.run(...valores);
-  return { rows: [], alteradas: info.changes };
+  const resultado = await postgres().query(marcadoresPostgres(sql), valores);
+  return { rows: resultado.rows, alteradas: resultado.rowCount };
 }
 
 /** Nomes das colunas da tabela de doações. */
 export async function colunas() {
-  const { rows } = await query(URL_BANCO
-    ? `SELECT column_name AS name FROM information_schema.columns
-        WHERE table_schema = current_schema() AND table_name = 'doacoes'`
-    : 'PRAGMA table_info(doacoes)');
+  const { rows } = await query(
+    `SELECT column_name AS name FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'doacoes'`
+  );
   return rows.map((c) => c.name);
 }
 
 /** Cria o schema, se ainda não existir. Rodado por `npm run db:migrar` e ao subir o servidor. */
 export async function migrar() {
-  const id = URL_BANCO ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
   await query(`
     CREATE TABLE IF NOT EXISTS doacoes (
-      id          ${id},
+      id          SERIAL PRIMARY KEY,
       tipo        TEXT NOT NULL,
       quantidade  TEXT NOT NULL,
-      validade    TEXT NOT NULL,
+      validade    DATE NOT NULL,
       status      TEXT NOT NULL DEFAULT 'disponivel',
       ong         TEXT,
       criada_em   TEXT NOT NULL,
@@ -89,13 +71,25 @@ export async function migrar() {
     )
   `);
 
-  // Colunas acrescentadas na Unidade 2 (ADR 0001 e H6c). O CREATE TABLE acima não altera
-  // uma tabela que já existe, então um dados.sqlite criado antes recebe as colunas aqui.
+  // O CREATE TABLE acima não altera uma tabela que já existe. Um banco criado antes
+  // das mudanças abaixo recebe os ajustes aqui, e rodar de novo não faz nada.
+
+  // Colunas acrescentadas na Unidade 2 (ADR 0001 e H6c).
   const existentes = await colunas();
   for (const coluna of ['aceita_em', 'coletada_em', 'retirada_em', 'motivo_retirada']) {
     if (!existentes.includes(coluna)) {
       await query(`ALTER TABLE doacoes ADD COLUMN ${coluna} TEXT`);
     }
+  }
+
+  // A validade era TEXT na primeira versão do schema; agora é DATE (ADR 0003). As datas já
+  // gravadas foram validadas como AAAA-MM-DD pela API, então a conversão não perde nada.
+  const { rows } = await query(
+    `SELECT data_type FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'doacoes' AND column_name = 'validade'`
+  );
+  if (rows[0].data_type !== 'date') {
+    await query('ALTER TABLE doacoes ALTER COLUMN validade TYPE DATE USING validade::date');
   }
 }
 
@@ -105,6 +99,5 @@ export async function limparBanco() {
 }
 
 export async function encerrar() {
-  if (db) { db.close(); db = undefined; }
   if (pool) { await pool.end(); pool = undefined; }
 }
